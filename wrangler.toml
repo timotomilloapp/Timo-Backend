@@ -1,4 +1,4 @@
 name = "timoapp"
-main = "dist/worker.js"
+main = "dist/worker.ts"
 compatibility_date = "2026-03-05"
 compatibility_flags = ["nodejs_compat"]
