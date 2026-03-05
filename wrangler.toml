@@ -1,0 +1,4 @@
+name = "timoapp"
+main = "dist/main.js"
+compatibility_date = "2026-03-05"
+nodejs_compat = true
