@@ -167,6 +167,7 @@ model Reservation {
 
   status   ReservationStatus @default(RESERVADA)
   servedAt DateTime?
+  printedAt DateTime?
 
   menu           Menu            @relation(fields: [menuId], references: [id], onDelete: Cascade)
   whitelistEntry WhitelistEntry? @relation(fields: [whitelistEntryId], references: [id], onDelete: SetNull)

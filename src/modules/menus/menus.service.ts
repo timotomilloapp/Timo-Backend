@@ -163,6 +163,7 @@ export class MenusService {
       select: {
         id: true,
         proteinTypeId: true,
+        printedAt: true,
       }
     });
 
@@ -171,6 +172,7 @@ export class MenusService {
       hasReservation: !!reservation,
       reservationId: reservation ? reservation.id : null,
       reservedProteinId: reservation ? reservation.proteinTypeId : null,
+      isPrinted: !!reservation?.printedAt,
     };
   }
 

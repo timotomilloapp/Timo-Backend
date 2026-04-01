@@ -201,6 +201,10 @@ export class ReservationsService {
       throw new BadRequestException('Cannot modify a cancelled reservation');
     }
 
+    if (reservation.printedAt) {
+      throw new BadRequestException('El ticket ya fue impreso y la reservación no puede ser modificada');
+    }
+
     // Validate protein is in menu options
     const validProteins = reservation.menu.proteinOptions.map(
       (o: { proteinTypeId: string }) => o.proteinTypeId,
@@ -267,6 +271,35 @@ export class ReservationsService {
     });
     this.logger.log(`CANCEL success — id=${id} cc=${cc}`);
     return result;
+  }
+
+  /* ───────── MARK AS PRINTED (admin) ───────── */
+
+  async markAsPrinted(id: string) {
+    this.logger.log(`MARK AS PRINTED — id=${id}`);
+
+    const reservation = await this.prisma.reservation.findUnique({
+      where: { id },
+      include: INCLUDE_RELATIONS,
+    });
+
+    if (!reservation) {
+      this.logger.warn(`MARK AS PRINTED rejected — id=${id} not found`);
+      throw new NotFoundException('Reservation not found');
+    }
+
+    if (reservation.printedAt) {
+      return reservation;
+    }
+
+    return await this.prisma.reservation.update({
+      where: { id },
+      data: {
+        printedAt: nowColombia(),
+        ...colombiaUpdatedAt(),
+      },
+      include: INCLUDE_RELATIONS,
+    });
   }
 
   /* ───────── DELETE (public) ───────── */
