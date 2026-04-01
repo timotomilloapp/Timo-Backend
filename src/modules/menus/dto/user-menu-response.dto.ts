@@ -17,4 +17,11 @@ export class UserMenuResponseDto extends MenuResponseDto {
         example: '123e4567-e89b-12d3-a456-426614174000',
     })
     reservationId?: string | null;
+
+    @ApiProperty({
+        description: 'Indicates if the reservation ticket has already been printed',
+        type: Boolean,
+        required: false,
+    })
+    isPrinted?: boolean;
 }

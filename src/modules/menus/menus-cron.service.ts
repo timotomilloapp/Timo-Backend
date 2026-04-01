@@ -12,7 +12,7 @@ export class MenusCronService {
         private readonly configService: ConfigService,
     ) { }
 
-    @Cron(process.env.MENU_CRON_SCHEDULE || '30 22 * * *', { timeZone: 'America/Bogota' })
+    @Cron(process.env.MENU_CRON_SCHEDULE || '59 23 * * *', { timeZone: 'America/Bogota' })
     async handleMenuStatusUpdate() {
         this.logger.debug('Running handleMenuStatusUpdate cron job');
         try {

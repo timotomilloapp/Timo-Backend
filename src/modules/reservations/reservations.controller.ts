@@ -212,6 +212,18 @@ export class ReservationsController {
     ) as Promise<ReservationSummaryDto>;
   }
 
+  @Patch(':id/printed')
+  @ApiOperation({ summary: 'Mark reservation ticket as printed (public - triggered by user print)' })
+  @ApiParam({ name: 'id', description: 'Reservation UUID' })
+  @ApiOkResponse({
+    description: 'Reservation marked as printed',
+    type: ReservationResponseDto,
+  })
+  @ApiNotFoundResponse({ description: 'Reservation not found' })
+  markAsPrinted(@Param('id') id: string): Promise<ReservationResponseDto> {
+    return this.reservations.markAsPrinted(id) as Promise<ReservationResponseDto>;
+  }
+
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete reservation (public - uses CC)' })
