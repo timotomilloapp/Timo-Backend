@@ -30,6 +30,7 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ProteinsService } from './proteins.service';
 import { CreateProteinDto } from './dto/create-protein.dto';
+import { UpdateProteinDto } from './dto/update-protein.dto';
 import { ProteinResponseDto } from './dto/protein-response.dto';
 
 @ApiTags('Proteins')
@@ -106,6 +107,23 @@ export class ProteinsController {
   @ApiNotFoundResponse({ description: 'ProteinType not found' })
   findOne(@Param('id') id: string): Promise<ProteinResponseDto> {
     return this.proteins.findOne(id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update protein type name' })
+  @ApiParam({ name: 'id', description: 'ProteinType UUID' })
+  @ApiOkResponse({
+    description: 'Protein updated',
+    type: ProteinResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Validation error' })
+  @ApiConflictResponse({ description: 'Protein name already exists' })
+  @ApiNotFoundResponse({ description: 'ProteinType not found' })
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateProteinDto,
+  ): Promise<ProteinResponseDto> {
+    return this.proteins.update(id, dto);
   }
 
   @Patch(':id/toggle')
