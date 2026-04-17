@@ -72,6 +72,20 @@ export class ProteinsService {
     });
   }
 
+  async findAllActive() {
+    return this.prisma.proteinType.findMany({
+      where: { isActive: true },
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
   async findOne(id: string) {
     const item = await this.prisma.proteinType.findUnique({
       where: { id },

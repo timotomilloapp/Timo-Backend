@@ -97,6 +97,17 @@ export class ProteinsController {
     return this.proteins.findAll({ q, active, skip, take });
   }
 
+  @Get('active/all')
+  @ApiOperation({ summary: 'List all active protein types without pagination' })
+  @ApiOkResponse({
+    description: 'List of all active protein types',
+    type: ProteinResponseDto,
+    isArray: true,
+  })
+  findAllActive(): Promise<ProteinResponseDto[]> {
+    return this.proteins.findAllActive();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get protein type by id' })
   @ApiParam({ name: 'id', description: 'ProteinType UUID' })
