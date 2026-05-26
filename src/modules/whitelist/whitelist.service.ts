@@ -10,7 +10,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateWhitelistDto } from './dto/create-whitelist.dto';
 import { UpdateWhitelistDto } from './dto/update-whitelist.dto';
 import * as XLSX from 'xlsx';
-import { colombiaTimestamps, colombiaUpdatedAt } from '../../common/date.util';
+import { colombiaTimestamps, colombiaUpdatedAt, nowColombia } from '../../common/date.util';
 
 const SELECT_FIELDS = {
   id: true,
@@ -474,6 +474,73 @@ export class WhitelistService {
       skipped: 0,
       errors,
       updated: updatedCount,
+    };
+  }
+
+  async getBirthdays() {
+    this.logger.log('GET birthdays request');
+
+    const entries = await this.prisma.whitelistEntry.findMany({
+      where: {
+        enabled: true,
+        birthdate: { not: null },
+      },
+      select: SELECT_FIELDS,
+    });
+
+    const now = nowColombia();
+
+    // Generate the next 8 days (today + 7 days) in Colombia local time
+    const next7Days = [];
+    for (let i = 0; i <= 7; i++) {
+      const d = new Date(now.getTime() + i * 24 * 60 * 60 * 1000);
+      next7Days.push({
+        month: d.getUTCMonth() + 1, // 1-based month
+        day: d.getUTCDate(),
+        index: i,
+      });
+    }
+
+    const upcoming = [];
+    const all = [...entries];
+
+    for (const entry of entries) {
+      if (!entry.birthdate) continue;
+      const bDate = new Date(entry.birthdate);
+      const bMonth = bDate.getUTCMonth() + 1;
+      const bDay = bDate.getUTCDate();
+
+      const match = next7Days.find((d) => d.month === bMonth && d.day === bDay);
+      if (match) {
+        upcoming.push({
+          ...entry,
+          daysUntil: match.index,
+        });
+      }
+    }
+
+    upcoming.sort((a, b) => a.daysUntil - b.daysUntil);
+
+    all.sort((a, b) => {
+      const aDate = new Date(a.birthdate!);
+      const bDate = new Date(b.birthdate!);
+      const aMonth = aDate.getUTCMonth();
+      const aDay = aDate.getUTCDate();
+      const bMonth = bDate.getUTCMonth();
+      const bDay = bDate.getUTCDate();
+
+      if (aMonth !== bMonth) {
+        return aMonth - bMonth;
+      }
+      if (aDay !== bDay) {
+        return aDay - bDay;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+    return {
+      upcoming,
+      all,
     };
   }
 }

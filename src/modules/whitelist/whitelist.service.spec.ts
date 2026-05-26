@@ -624,4 +624,58 @@ describe('WhitelistService', () => {
       );
     });
   });
+
+  describe('getBirthdays', () => {
+    let dateSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      // Mock Date.now() to a fixed date, e.g. 2026-05-26T12:00:00Z
+      // Colombia offset is -5 hours. So local Colombia time will be 2026-05-26T07:00:00Z
+      dateSpy = jest.spyOn(Date, 'now').mockReturnValue(new Date('2026-05-26T12:00:00Z').getTime());
+    });
+
+    afterEach(() => {
+      dateSpy.mockRestore();
+    });
+
+    it('should return empty upcoming and all lists if no employees have birthdates', async () => {
+      prisma.whitelistEntry.findMany.mockResolvedValue([]);
+
+      const result = await service.getBirthdays();
+
+      expect(result).toEqual({ upcoming: [], all: [] });
+      expect(prisma.whitelistEntry.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            enabled: true,
+            birthdate: { not: null },
+          }),
+        }),
+      );
+    });
+
+    it('should filter and sort upcoming and all birthdays correctly', async () => {
+      const emp1 = makeFakeEntry({ name: 'Alice', birthdate: new Date('1990-05-26T00:00:00Z') }); // Today (May 26)
+      const emp2 = makeFakeEntry({ name: 'Bob', birthdate: new Date('1992-05-28T00:00:00Z') });   // In 2 days (May 28)
+      const emp3 = makeFakeEntry({ name: 'Charlie', birthdate: new Date('1985-06-02T00:00:00Z') }); // In 7 days (June 2)
+      const emp4 = makeFakeEntry({ name: 'David', birthdate: new Date('1988-06-03T00:00:00Z') });   // In 8 days (June 3) - NOT upcoming
+      const emp5 = makeFakeEntry({ name: 'Eve', birthdate: new Date('1994-01-15T00:00:00Z') });     // January 15 - NOT upcoming
+
+      prisma.whitelistEntry.findMany.mockResolvedValue([emp1, emp2, emp3, emp4, emp5]);
+
+      const result = await service.getBirthdays();
+
+      expect(result.upcoming).toHaveLength(3);
+      expect(result.upcoming[0]).toEqual(expect.objectContaining({ name: 'Alice', daysUntil: 0 }));
+      expect(result.upcoming[1]).toEqual(expect.objectContaining({ name: 'Bob', daysUntil: 2 }));
+      expect(result.upcoming[2]).toEqual(expect.objectContaining({ name: 'Charlie', daysUntil: 7 }));
+
+      expect(result.all).toHaveLength(5);
+      expect(result.all[0].name).toBe('Eve'); // Jan 15
+      expect(result.all[1].name).toBe('Alice'); // May 26
+      expect(result.all[2].name).toBe('Bob'); // May 28
+      expect(result.all[3].name).toBe('Charlie'); // June 2
+      expect(result.all[4].name).toBe('David'); // June 3
+    });
+  });
 });

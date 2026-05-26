@@ -133,6 +133,28 @@ export class WhitelistController {
     return this.whitelist.findAll({ q, enabled, skip, take });
   }
 
+  @Get('birthdays')
+  @ApiOperation({ summary: 'Get upcoming and all birthdays from whitelist' })
+  @ApiOkResponse({
+    description: 'Birthdays list successfully retrieved',
+    schema: {
+      type: 'object',
+      properties: {
+        upcoming: {
+          type: 'array',
+          items: { $ref: '#/components/schemas/WhitelistResponseDto' },
+        },
+        all: {
+          type: 'array',
+          items: { $ref: '#/components/schemas/WhitelistResponseDto' },
+        },
+      },
+    },
+  })
+  getBirthdays(): Promise<{ upcoming: any[]; all: any[] }> {
+    return this.whitelist.getBirthdays();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get whitelist entry by id' })
   @ApiParam({ name: 'id', description: 'WhitelistEntry UUID' })
