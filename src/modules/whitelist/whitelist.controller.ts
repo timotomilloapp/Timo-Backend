@@ -51,7 +51,7 @@ import { Public } from '../auth/decorators/public.decorator';
 @UseGuards(JwtAuthGuard)
 @Controller('whitelist')
 export class WhitelistController {
-  constructor(private readonly whitelist: WhitelistService) { }
+  constructor(private readonly whitelist: WhitelistService) {}
 
   @Post('login')
   @Public()
@@ -119,7 +119,7 @@ export class WhitelistController {
         },
         total: { type: 'number' },
       },
-    }
+    },
   })
   @ApiBadRequestResponse({
     description: 'Invalid query params (e.g., take > 200)',
@@ -129,8 +129,30 @@ export class WhitelistController {
     @Query('enabled', new ParseBoolPipe({ optional: true })) enabled?: boolean,
     @Query('skip', new ParseIntPipe({ optional: true })) skip?: number,
     @Query('take', new ParseIntPipe({ optional: true })) take?: number,
-  ): Promise<{ data: WhitelistResponseDto[], total: number }> {
+  ): Promise<{ data: WhitelistResponseDto[]; total: number }> {
     return this.whitelist.findAll({ q, enabled, skip, take });
+  }
+
+  @Get('birthdays')
+  @ApiOperation({ summary: 'Get upcoming and all birthdays from whitelist' })
+  @ApiOkResponse({
+    description: 'Birthdays list successfully retrieved',
+    schema: {
+      type: 'object',
+      properties: {
+        upcoming: {
+          type: 'array',
+          items: { $ref: '#/components/schemas/WhitelistResponseDto' },
+        },
+        all: {
+          type: 'array',
+          items: { $ref: '#/components/schemas/WhitelistResponseDto' },
+        },
+      },
+    },
+  })
+  getBirthdays(): Promise<{ upcoming: any[]; all: any[] }> {
+    return this.whitelist.getBirthdays();
   }
 
   @Get(':id')

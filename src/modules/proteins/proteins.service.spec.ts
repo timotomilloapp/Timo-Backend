@@ -192,7 +192,10 @@ describe('ProteinsService', () => {
    * ═══════════════════════════════════════════════ */
   describe('toggle', () => {
     it('should set isActive to false if true', async () => {
-      prisma.proteinType.findUnique.mockResolvedValue({ id: 'prot-1', isActive: true });
+      prisma.proteinType.findUnique.mockResolvedValue({
+        id: 'prot-1',
+        isActive: true,
+      });
       const updated = fakeProtein({ isActive: false });
       prisma.proteinType.update.mockResolvedValue(updated);
 
@@ -212,9 +215,7 @@ describe('ProteinsService', () => {
     it('should throw NotFoundException when not found', async () => {
       prisma.proteinType.findUnique.mockResolvedValue(null);
 
-      await expect(service.toggle('nope')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.toggle('nope')).rejects.toThrow(NotFoundException);
     });
   });
 

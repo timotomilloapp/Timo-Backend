@@ -54,7 +54,7 @@ function deriveDayOfWeek(dateStr: string): DayOfWeek {
 export class MenusService {
   private readonly logger = new Logger(MenusService.name);
 
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateMenuDto) {
     this.logger.log(`CREATE menu — date=${dto.date}`);
@@ -76,10 +76,10 @@ export class MenusService {
           defaultProteinTypeId,
           proteinOptions: dto.proteinOptionIds?.length
             ? {
-              create: dto.proteinOptionIds.map((id) => ({
-                proteinTypeId: id,
-              })),
-            }
+                create: dto.proteinOptionIds.map((id) => ({
+                  proteinTypeId: id,
+                })),
+              }
             : undefined,
           sideOptions: dto.sideOptionIds?.length
             ? { create: dto.sideOptionIds.map((id) => ({ sideDishId: id })) }
@@ -108,8 +108,14 @@ export class MenusService {
     this.logger.log(`CREATE menu success — date=${dto.date}`);
   }
 
-  async findAll(params: { skip?: number; take?: number; startDate?: string; endDate?: string }) {
-    const { skip = 0, take = 50, startDate, endDate } = params;
+  async findAll(params: {
+    skip?: number;
+    take?: number;
+    startDate?: string;
+    endDate?: string;
+    cc?: string;
+  }) {
+    const { skip = 0, take = 50, startDate, endDate, cc } = params;
 
     if (take > 200) throw new BadRequestException('take max is 200');
 
@@ -121,12 +127,45 @@ export class MenusService {
       where.date = { ...where.date, lte: new Date(endDate + 'T23:59:59Z') };
     }
 
-    return this.prisma.menu.findMany({
+    const menus = await this.prisma.menu.findMany({
       where,
       orderBy: { date: 'desc' },
       skip,
       take,
       include: INCLUDE_RELATIONS,
+    });
+
+    if (!cc) {
+      return menus;
+    }
+
+    const menuIds = menus.map((m) => m.id);
+    const reservations = await this.prisma.reservation.findMany({
+      where: {
+        menuId: { in: menuIds },
+        cc: cc.trim(),
+      },
+      select: {
+        id: true,
+        menuId: true,
+        proteinTypeId: true,
+        printedAt: true,
+      },
+    });
+
+    const reservationsMap = new Map(
+      reservations.map((r) => [r.menuId, r]),
+    );
+
+    return menus.map((menu) => {
+      const res = reservationsMap.get(menu.id);
+      return {
+        ...menu,
+        hasReservation: !!res,
+        reservationId: res ? res.id : null,
+        reservedProteinId: res ? res.proteinTypeId : null,
+        isPrinted: !!res?.printedAt,
+      };
     });
   }
 
@@ -164,7 +203,7 @@ export class MenusService {
         id: true,
         proteinTypeId: true,
         printedAt: true,
-      }
+      },
     });
 
     return {
@@ -206,21 +245,19 @@ export class MenusService {
           defaultProteinTypeId: source.defaultProteinTypeId,
           proteinOptions: source.proteinOptions.length
             ? {
-              create: source.proteinOptions.map(
-                (o: { proteinTypeId: string }) => ({
-                  proteinTypeId: o.proteinTypeId,
-                }),
-              ),
-            }
+                create: source.proteinOptions.map(
+                  (o: { proteinTypeId: string }) => ({
+                    proteinTypeId: o.proteinTypeId,
+                  }),
+                ),
+              }
             : undefined,
           sideOptions: source.sideOptions.length
             ? {
-              create: source.sideOptions.map(
-                (o: { sideDishId: string }) => ({
+                create: source.sideOptions.map((o: { sideDishId: string }) => ({
                   sideDishId: o.sideDishId,
-                }),
-              ),
-            }
+                })),
+              }
             : undefined,
           ...colombiaTimestamps(),
         },
@@ -348,7 +385,9 @@ export class MenusService {
       },
     });
 
-    this.logger.log(`Updated ${result.count} menu(s) to SERVED status for date=${todayStr}`);
+    this.logger.log(
+      `Updated ${result.count} menu(s) to SERVED status for date=${todayStr}`,
+    );
     return result;
   }
 

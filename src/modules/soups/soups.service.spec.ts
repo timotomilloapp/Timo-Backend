@@ -188,7 +188,10 @@ describe('SoupsService', () => {
    * ═══════════════════════════════════════════════ */
   describe('toggle', () => {
     it('should set isActive to false if true', async () => {
-      prisma.soup.findUnique.mockResolvedValue({ id: 'soup-1', isActive: true });
+      prisma.soup.findUnique.mockResolvedValue({
+        id: 'soup-1',
+        isActive: true,
+      });
       const updated = fakeSoup({ isActive: false });
       prisma.soup.update.mockResolvedValue(updated);
 
@@ -208,9 +211,7 @@ describe('SoupsService', () => {
     it('should throw NotFoundException when not found', async () => {
       prisma.soup.findUnique.mockResolvedValue(null);
 
-      await expect(service.toggle('nope')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.toggle('nope')).rejects.toThrow(NotFoundException);
     });
   });
 

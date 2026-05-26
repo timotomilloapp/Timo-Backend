@@ -14,7 +14,7 @@ interface PrismaError {
 
 @Injectable()
 export class SoupsService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateSoupDto) {
     const name = dto.name?.trim();

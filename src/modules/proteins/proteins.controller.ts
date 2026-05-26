@@ -41,7 +41,7 @@ import { ProteinResponseDto } from './dto/protein-response.dto';
 @UseGuards(JwtAuthGuard)
 @Controller('proteins')
 export class ProteinsController {
-  constructor(private readonly proteins: ProteinsService) { }
+  constructor(private readonly proteins: ProteinsService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create protein type' })

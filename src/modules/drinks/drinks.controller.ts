@@ -40,7 +40,7 @@ import { DrinkResponseDto } from './dto/drink-response.dto';
 @UseGuards(JwtAuthGuard)
 @Controller('drinks')
 export class DrinksController {
-  constructor(private readonly drinks: DrinksService) { }
+  constructor(private readonly drinks: DrinksService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create drink' })

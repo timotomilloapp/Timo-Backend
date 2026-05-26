@@ -11,6 +11,8 @@ import { ReservationsModule } from './modules/reservations/reservations.module';
 import { HealthModule } from './modules/health/health.module';
 import { UsersModule } from './modules/users/users.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { AreasModule } from './modules/areas/areas.module';
+import { AppetizersModule } from './modules/appetizers/appetizers.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { ScheduleModule } from '@nestjs/schedule';
     ReservationsModule,
     HealthModule,
     UsersModule,
+    AreasModule,
+    AppetizersModule,
   ],
 })
-export class AppModule { }
+export class AppModule {}

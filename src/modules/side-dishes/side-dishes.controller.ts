@@ -40,7 +40,7 @@ import { SideDishResponseDto } from './dto/side-dish-response.dto';
 @UseGuards(JwtAuthGuard)
 @Controller('side-dishes')
 export class SideDishesController {
-  constructor(private readonly sideDishes: SideDishesService) { }
+  constructor(private readonly sideDishes: SideDishesService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create side dish' })

@@ -32,4 +32,11 @@ export class BulkResultResponseDto {
     description: 'Details of rows that failed validation',
   })
   errors!: BulkErrorItem[];
+
+  @ApiProperty({
+    example: 5,
+    description: 'Number of entries successfully updated',
+    required: false,
+  })
+  updated?: number;
 }

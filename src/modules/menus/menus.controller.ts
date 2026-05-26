@@ -38,7 +38,7 @@ import { UserMenuResponseDto } from './dto/user-menu-response.dto';
 @ApiTags('Menus')
 @Controller('menus')
 export class MenusController {
-  constructor(private readonly menus: MenusService) { }
+  constructor(private readonly menus: MenusService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -90,6 +90,12 @@ export class MenusController {
     type: String,
     description: 'Filter by end date (YYYY-MM-DD)',
   })
+  @ApiQuery({
+    name: 'cc',
+    required: false,
+    type: String,
+    description: 'Filter reservations for a specific user CC',
+  })
   @ApiBadRequestResponse({
     description: 'Invalid query params (e.g., take > 200)',
   })
@@ -98,8 +104,9 @@ export class MenusController {
     @Query('take', new ParseIntPipe({ optional: true })) take?: number,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
-  ): Promise<MenuResponseDto[]> {
-    return this.menus.findAll({ skip, take, startDate, endDate });
+    @Query('cc') cc?: string,
+  ): Promise<any[]> {
+    return this.menus.findAll({ skip, take, startDate, endDate, cc });
   }
 
   @Get('by-date/:date')
@@ -115,7 +122,9 @@ export class MenusController {
   }
 
   @Get('by-date/:date/user/:cc')
-  @ApiOperation({ summary: 'Get menu by date with user reservation status (public)' })
+  @ApiOperation({
+    summary: 'Get menu by date with user reservation status (public)',
+  })
   @ApiParam({ name: 'date', description: 'Date in YYYY-MM-DD format' })
   @ApiParam({ name: 'cc', description: 'User document (CC)' })
   @ApiOkResponse({
@@ -127,7 +136,10 @@ export class MenusController {
     @Param('date') date: string,
     @Param('cc') cc: string,
   ): Promise<UserMenuResponseDto> {
-    return this.menus.findForUserByDate(date, cc) as Promise<UserMenuResponseDto>;
+    return this.menus.findForUserByDate(
+      date,
+      cc,
+    ) as Promise<UserMenuResponseDto>;
   }
 
   @Get(':id')

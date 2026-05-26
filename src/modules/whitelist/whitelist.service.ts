@@ -10,7 +10,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateWhitelistDto } from './dto/create-whitelist.dto';
 import { UpdateWhitelistDto } from './dto/update-whitelist.dto';
 import * as XLSX from 'xlsx';
-import { colombiaTimestamps, colombiaUpdatedAt } from '../../common/date.util';
+import { colombiaTimestamps, colombiaUpdatedAt, nowColombia } from '../../common/date.util';
 
 const SELECT_FIELDS = {
   id: true,
@@ -18,6 +18,17 @@ const SELECT_FIELDS = {
   name: true,
   enabled: true,
   publicToken: true,
+  birthdate: true,
+  areaId: true,
+  area: {
+    select: {
+      id: true,
+      name: true,
+      isActive: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -26,15 +37,35 @@ const SELECT_FIELDS = {
 export class WhitelistService {
   private readonly logger = new Logger(WhitelistService.name);
 
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateWhitelistDto) {
     const cc = dto.cc?.trim();
     const name = dto.name?.trim();
+    const birthdate = dto.birthdate
+      ? new Date(dto.birthdate + 'T00:00:00Z')
+      : null;
+    const areaId = dto.areaId ?? null;
+
+    if (areaId) {
+      const area = await this.prisma.area.findUnique({
+        where: { id: areaId },
+        select: { id: true, isActive: true },
+      });
+      if (!area) throw new NotFoundException('Area not found');
+      if (!area.isActive)
+        throw new BadRequestException('Referenced area is inactive');
+    }
 
     try {
       return await this.prisma.whitelistEntry.create({
-        data: { cc: cc, name: name, ...colombiaTimestamps() },
+        data: {
+          cc,
+          name,
+          birthdate,
+          areaId,
+          ...colombiaTimestamps(),
+        },
         select: SELECT_FIELDS,
       });
     } catch (e: unknown) {
@@ -61,11 +92,11 @@ export class WhitelistService {
       ...(typeof enabled === 'boolean' ? { enabled } : {}),
       ...(q?.trim()
         ? {
-          OR: [
-            { name: { contains: q.trim(), mode: 'insensitive' as const } },
-            { cc: { contains: q.trim(), mode: 'insensitive' as const } },
-          ],
-        }
+            OR: [
+              { name: { contains: q.trim(), mode: 'insensitive' as const } },
+              { cc: { contains: q.trim(), mode: 'insensitive' as const } },
+            ],
+          }
         : {}),
     };
 
@@ -77,7 +108,7 @@ export class WhitelistService {
         skip,
         take,
         select: SELECT_FIELDS,
-      })
+      }),
     ]);
 
     return { data, total };
@@ -118,13 +149,32 @@ export class WhitelistService {
   }
 
   async update(id: string, dto: UpdateWhitelistDto) {
-    const data: Record<string, string> = {};
+    const data: Record<string, any> = {};
     if (dto.cc !== undefined) data.cc = dto.cc.trim();
     if (dto.name !== undefined) data.name = dto.name.trim();
 
+    if (dto.birthdate !== undefined) {
+      data.birthdate = dto.birthdate
+        ? new Date(dto.birthdate + 'T00:00:00Z')
+        : null;
+    }
+
+    if (dto.areaId !== undefined) {
+      if (dto.areaId) {
+        const area = await this.prisma.area.findUnique({
+          where: { id: dto.areaId },
+          select: { id: true, isActive: true },
+        });
+        if (!area) throw new NotFoundException('Area not found');
+        if (!area.isActive)
+          throw new BadRequestException('Referenced area is inactive');
+      }
+      data.areaId = dto.areaId;
+    }
+
     if (Object.keys(data).length === 0) {
       throw new BadRequestException(
-        'At least one field (cc or name) must be provided',
+        'At least one field must be provided for update',
       );
     }
 
@@ -187,7 +237,7 @@ export class WhitelistService {
 
   async bulkCreate(buffer: Buffer) {
     this.logger.log('Starting bulk whitelist creation process');
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, {
       defval: '',
@@ -195,73 +245,343 @@ export class WhitelistService {
 
     if (rows.length === 0) {
       this.logger.warn('Bulk upload failed: Empty file or invalid format');
-      throw new BadRequestException('El archivo está vacío o no tiene formato válido de tabla.');
+      throw new BadRequestException(
+        'El archivo está vacío o no tiene formato válido de tabla.',
+      );
     }
 
-    // Check headers intuitively by sampling the first row
+    // Check headers intuitively by sampling the first row keys
     const firstRow = rows[0];
-    const hasCCHeader = Object.keys(firstRow).some(key => key.toLowerCase() === 'cc');
-    const hasNameHeader = Object.keys(firstRow).some(key => key.toLowerCase() === 'name' || key.toLowerCase() === 'nombre');
+    const keys = Object.keys(firstRow);
+    const ccKey = keys.find((key) => key.toLowerCase() === 'cc');
+    const nameKey = keys.find(
+      (key) => key.toLowerCase() === 'name' || key.toLowerCase() === 'nombre',
+    );
 
-    if (!hasCCHeader || !hasNameHeader) {
+    if (!ccKey || !nameKey) {
       this.logger.warn('Bulk upload failed: Missing required columns');
-      throw new BadRequestException('El archivo debe contener las columnas "cc" y "name" (o "nombre").');
+      throw new BadRequestException(
+        'El archivo debe contener las columnas "cc" y "name" (o "nombre").',
+      );
     }
+
+    // Locate optional column keys
+    const areaKey = keys.find(
+      (key) =>
+        key.toLowerCase() === 'area' ||
+        key.toLowerCase() === 'área' ||
+        key.toLowerCase() === 'nombre_area' ||
+        key.toLowerCase() === 'area_name' ||
+        key.toLowerCase() === 'areaname',
+    );
+
+    const birthdateKey = keys.find(
+      (key) =>
+        key.toLowerCase() === 'birthdate' ||
+        key.toLowerCase() === 'fecha_nacimiento' ||
+        key.toLowerCase() === 'nacimiento' ||
+        key.toLowerCase() === 'cumpleaños' ||
+        key.toLowerCase() === 'birth_date' ||
+        key.toLowerCase() === 'birthdate',
+    );
 
     this.logger.log(`Parsed ${rows.length} rows from uploaded file`);
 
     const errors: { row: number; cc: string; reason: string }[] = [];
-    const validEntries: { cc: string; name: string }[] = [];
+    const validEntries: {
+      cc: string;
+      name: string;
+      birthdate: Date | null;
+      areaName: string;
+      areaId: string | null;
+    }[] = [];
+
+    // Pre-fetch all areas to build cache
+    const existingAreas = await this.prisma.area.findMany();
+    const areaMap = new Map<string, string>(
+      existingAreas.map((a) => [a.name.toLowerCase().trim(), a.id]),
+    );
+
+    const getAreaIdByName = async (
+      areaName: string,
+    ): Promise<string | null> => {
+      const normalized = areaName.toLowerCase().trim();
+      if (!normalized) return null;
+
+      if (areaMap.has(normalized)) {
+        return areaMap.get(normalized)!;
+      }
+
+      try {
+        const newArea = await this.prisma.area.create({
+          data: {
+            name: areaName.trim(),
+            isActive: true,
+            ...colombiaTimestamps(),
+          },
+          select: { id: true },
+        });
+        areaMap.set(normalized, newArea.id);
+        return newArea.id;
+      } catch (e) {
+        const existing = await this.prisma.area.findUnique({
+          where: { name: areaName.trim() },
+          select: { id: true },
+        });
+        if (existing) {
+          areaMap.set(normalized, existing.id);
+          return existing.id;
+        }
+        return null;
+      }
+    };
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
-      const cc = String(row['cc'] ?? row['CC'] ?? row['Cc'] ?? '').trim();
-      const name = String(
-        row['name'] ??
-        row['Name'] ??
-        row['NAME'] ??
-        row['nombre'] ??
-        row['Nombre'] ??
-        '',
-      ).trim();
+      const cc = String(row[ccKey] ?? '').trim();
+      const name = String(row[nameKey] ?? '').trim();
+      const areaName = areaKey ? String(row[areaKey] ?? '').trim() : '';
+      const rawBirthdate = birthdateKey ? row[birthdateKey] : null;
 
       if (!cc || cc.length < 2) {
         errors.push({
           row: i + 2,
           cc: cc || '(empty)',
-          reason: 'Missing or invalid cc',
+          reason: 'Cédula faltante o muy corta (mínimo 2 caracteres)',
         });
         continue;
       }
       if (!name || name.length < 2) {
-        errors.push({ row: i + 2, cc, reason: 'Missing or invalid name' });
+        errors.push({
+          row: i + 2,
+          cc,
+          reason: 'Nombre faltante o muy corto (mínimo 2 caracteres)',
+        });
         continue;
       }
 
-      validEntries.push({ cc, name });
+      // Map area name to areaId
+      let areaId: string | null = null;
+      if (areaName) {
+        areaId = await getAreaIdByName(areaName);
+      }
+
+      // Parse birthdate
+      let birthdate: Date | null = null;
+      if (rawBirthdate) {
+        birthdate = parseBirthdate(rawBirthdate);
+        if (!birthdate) {
+          this.logger.warn(
+            `Row ${i + 2}: CC=${cc} has invalid birthdate "${rawBirthdate}"`,
+          );
+        }
+      }
+
+      validEntries.push({
+        cc,
+        name,
+        birthdate,
+        areaName,
+        areaId,
+      });
     }
 
     if (validEntries.length === 0) {
-      this.logger.warn(`Bulk process finished with 0 valid entries out of ${rows.length} total rows. Errors: ${errors.length}`);
-      return { created: 0, skipped: 0, errors };
+      this.logger.warn(
+        `Bulk process finished with 0 valid entries out of ${rows.length} total rows. Errors: ${errors.length}`,
+      );
+      return { created: 0, skipped: 0, errors, updated: 0 };
     }
 
-    const now = colombiaTimestamps();
-    const result = await this.prisma.whitelistEntry.createMany({
-      data: validEntries.map((e) => ({ ...e, ...now })),
-      skipDuplicates: true,
+    // Fetch all existing entries matching these CCs
+    const targetCcs = validEntries.map((e) => e.cc);
+    const existingEntries = await this.prisma.whitelistEntry.findMany({
+      where: { cc: { in: targetCcs } },
+      select: { id: true, cc: true },
     });
 
-    const skipped = validEntries.length - result.count;
+    const existingCcMap = new Map<string, string>(
+      existingEntries.map((e) => [e.cc, e.id]),
+    );
+
+    const toCreate: any[] = [];
+    const toUpdate: {
+      id: string;
+      name: string;
+      birthdate: Date | null;
+      areaId: string | null;
+    }[] = [];
+
+    const now = colombiaTimestamps();
+
+    for (const entry of validEntries) {
+      const existingId = existingCcMap.get(entry.cc);
+      if (existingId) {
+        toUpdate.push({
+          id: existingId,
+          name: entry.name,
+          birthdate: entry.birthdate,
+          areaId: entry.areaId,
+        });
+      } else {
+        toCreate.push({
+          cc: entry.cc,
+          name: entry.name,
+          birthdate: entry.birthdate,
+          areaId: entry.areaId,
+          enabled: true,
+          ...now,
+        });
+      }
+    }
+
+    let createdCount = 0;
+    let updatedCount = 0;
+
+    await this.prisma.$transaction(async (tx) => {
+      // 1. Bulk Create
+      if (toCreate.length > 0) {
+        const res = await tx.whitelistEntry.createMany({
+          data: toCreate,
+        });
+        createdCount = res.count;
+      }
+
+      // 2. Individual Updates
+      if (toUpdate.length > 0) {
+        for (const item of toUpdate) {
+          await tx.whitelistEntry.update({
+            where: { id: item.id },
+            data: {
+              name: item.name,
+              birthdate: item.birthdate,
+              areaId: item.areaId,
+              enabled: true,
+              ...colombiaUpdatedAt(),
+            },
+          });
+          updatedCount++;
+        }
+      }
+    });
 
     this.logger.log(
-      `Bulk process completed. Created: ${result.count}, Skipped (duplicates): ${skipped}, Invalid Rows: ${errors.length}`
+      `Bulk process completed. Created: ${createdCount}, Updated: ${updatedCount}, Invalid Rows: ${errors.length}`,
     );
 
     return {
-      created: result.count,
-      skipped,
+      created: createdCount,
+      skipped: 0,
       errors,
+      updated: updatedCount,
     };
   }
+
+  async getBirthdays() {
+    this.logger.log('GET birthdays request');
+
+    const entries = await this.prisma.whitelistEntry.findMany({
+      where: {
+        enabled: true,
+        birthdate: { not: null },
+      },
+      select: SELECT_FIELDS,
+    });
+
+    const now = nowColombia();
+
+    // Generate the next 8 days (today + 7 days) in Colombia local time
+    const next7Days = [];
+    for (let i = 0; i <= 7; i++) {
+      const d = new Date(now.getTime() + i * 24 * 60 * 60 * 1000);
+      next7Days.push({
+        month: d.getUTCMonth() + 1, // 1-based month
+        day: d.getUTCDate(),
+        index: i,
+      });
+    }
+
+    const upcoming = [];
+    const all = [...entries];
+
+    for (const entry of entries) {
+      if (!entry.birthdate) continue;
+      const bDate = new Date(entry.birthdate);
+      const bMonth = bDate.getUTCMonth() + 1;
+      const bDay = bDate.getUTCDate();
+
+      const match = next7Days.find((d) => d.month === bMonth && d.day === bDay);
+      if (match) {
+        upcoming.push({
+          ...entry,
+          daysUntil: match.index,
+        });
+      }
+    }
+
+    upcoming.sort((a, b) => a.daysUntil - b.daysUntil);
+
+    all.sort((a, b) => {
+      const aDate = new Date(a.birthdate!);
+      const bDate = new Date(b.birthdate!);
+      const aMonth = aDate.getUTCMonth();
+      const aDay = aDate.getUTCDate();
+      const bMonth = bDate.getUTCMonth();
+      const bDay = bDate.getUTCDate();
+
+      if (aMonth !== bMonth) {
+        return aMonth - bMonth;
+      }
+      if (aDay !== bDay) {
+        return aDay - bDay;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+    return {
+      upcoming,
+      all,
+    };
+  }
+}
+
+function parseBirthdate(val: any): Date | null {
+  if (!val) return null;
+  if (val instanceof Date) {
+    if (!isNaN(val.getTime())) {
+      return val;
+    }
+  }
+  if (typeof val === 'number') {
+    const date = new Date((val - 25569) * 86400 * 1000);
+    if (!isNaN(date.getTime())) return date;
+  }
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (!trimmed) return null;
+
+    let date = new Date(trimmed);
+    if (!isNaN(date.getTime())) return date;
+
+    const partsSlash = trimmed.split('/');
+    if (partsSlash.length === 3) {
+      const day = parseInt(partsSlash[0], 10);
+      const month = parseInt(partsSlash[1], 10) - 1;
+      const year = parseInt(partsSlash[2], 10);
+      date = new Date(Date.UTC(year, month, day));
+      if (!isNaN(date.getTime())) return date;
+    }
+
+    const partsDash = trimmed.split('-');
+    if (partsDash.length === 3) {
+      const day = parseInt(partsDash[0], 10);
+      const month = parseInt(partsDash[1], 10) - 1;
+      const year = parseInt(partsDash[2], 10);
+      if (day < 32 && year > 1000) {
+        date = new Date(Date.UTC(year, month, day));
+        if (!isNaN(date.getTime())) return date;
+      }
+    }
+  }
+  return null;
 }

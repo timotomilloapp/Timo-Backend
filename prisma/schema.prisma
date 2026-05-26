@@ -28,6 +28,10 @@ model WhitelistEntry {
 
   publicToken String @unique @default(uuid()) @db.Uuid
 
+  birthdate DateTime? @db.Date
+  areaId    String?   @db.Uuid
+  area      Area?     @relation(fields: [areaId], references: [id], onDelete: SetNull)
+
   reservations Reservation[]
 
   @@map("whitelist")
@@ -198,3 +202,37 @@ model ReservationSideDish {
   @@index([reservationId])
   @@index([sideDishId])
 }
+
+model Area {
+  id               String           @id @default(uuid()) @db.Uuid
+  name             String           @unique @db.VarChar(80)
+  isActive         Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  appetizers       Appetizer[]
+  whitelistEntries WhitelistEntry[]
+
+  @@map("areas")
+}
+
+enum AppetizerStatus {
+  PENDIENTE
+  ENTREGADO
+}
+
+model Appetizer {
+  id           String          @id @default(uuid()) @db.Uuid
+  quantity     Int
+  areaId       String          @db.Uuid
+  area         Area            @relation(fields: [areaId], references: [id])
+  date         DateTime        @db.Date
+  observations String          @db.Text
+  status       AppetizerStatus @default(PENDIENTE)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@map("appetizers")
+  @@index([areaId])
+  @@index([date])
+}
+
