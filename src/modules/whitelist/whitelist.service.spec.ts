@@ -9,23 +9,40 @@ import {
 import * as XLSX from 'xlsx';
 
 /* ───────── Prisma mock factory ───────── */
-const mockPrisma = () => ({
-  whitelistEntry: {
-    create: jest.fn(),
-    findMany: jest.fn(),
-    findUnique: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
-    createMany: jest.fn(),
-    count: jest.fn(),
-  },
-  $transaction: jest.fn(async (queries) => {
-    if (Array.isArray(queries)) {
-      return Promise.all(queries);
-    }
-    return queries;
-  }),
-});
+const mockPrisma = () => {
+  const txMock = {
+    whitelistEntry: {
+      createMany: jest.fn().mockResolvedValue({ count: 2 }),
+      update: jest.fn().mockResolvedValue({}),
+    },
+  };
+  return {
+    whitelistEntry: {
+      create: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      createMany: jest.fn(),
+      count: jest.fn(),
+    },
+    area: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+    },
+    $transaction: jest.fn(async (arg) => {
+      if (typeof arg === 'function') {
+        return arg(txMock);
+      }
+      if (Array.isArray(arg)) {
+        return Promise.all(arg);
+      }
+      return arg;
+    }),
+    _txMock: txMock, // Expose inner mock for assertions
+  };
+};
 
 type MockPrisma = ReturnType<typeof mockPrisma>;
 
@@ -48,6 +65,8 @@ type WhitelistEntry = {
   name: string;
   enabled: boolean;
   publicToken: string;
+  birthdate?: Date | null;
+  areaId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -145,6 +164,56 @@ describe('WhitelistService', () => {
       await expect(
         service.create({ cc: '123456', name: 'John Doe' }),
       ).rejects.toThrow(ConflictException);
+    });
+
+    it('should throw NotFoundException if Area does not exist', async () => {
+      prisma.area.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.create({ cc: '123456', name: 'John Doe', areaId: 'nope' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException if Area is inactive', async () => {
+      prisma.area.findUnique.mockResolvedValue({
+        id: 'area-1',
+        isActive: false,
+      });
+
+      await expect(
+        service.create({ cc: '123456', name: 'John Doe', areaId: 'area-1' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should create entry with areaId and birthdate', async () => {
+      prisma.area.findUnique.mockResolvedValue({
+        id: 'area-1',
+        isActive: true,
+      });
+      const entry: WhitelistEntry = makeFakeEntry({
+        birthdate: new Date('1995-10-15T00:00:00Z'),
+        areaId: 'area-1',
+      });
+      prisma.whitelistEntry.create.mockResolvedValue(entry);
+
+      const result = asUnknown<WhitelistEntry>(
+        await service.create({
+          cc: '123456',
+          name: 'John Doe',
+          birthdate: '1995-10-15',
+          areaId: 'area-1',
+        }),
+      );
+
+      expect(result.areaId).toBe('area-1');
+      expect(prisma.whitelistEntry.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            birthdate: new Date('1995-10-15T00:00:00Z'),
+            areaId: 'area-1',
+          }),
+        }),
+      );
     });
 
     it('should rethrow non-P2002 errors', async () => {
@@ -311,6 +380,55 @@ describe('WhitelistService', () => {
         service.update('uuid-1', { cc: 'duplicate-cc' }),
       ).rejects.toThrow(ConflictException);
     });
+
+    it('should throw NotFoundException on update if Area does not exist', async () => {
+      prisma.area.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.update('uuid-1', { areaId: 'nope' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException on update if Area is inactive', async () => {
+      prisma.area.findUnique.mockResolvedValue({
+        id: 'area-1',
+        isActive: false,
+      });
+
+      await expect(
+        service.update('uuid-1', { areaId: 'area-1' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should update birthdate and areaId', async () => {
+      prisma.whitelistEntry.findUnique.mockResolvedValue({ id: 'uuid-1' });
+      prisma.area.findUnique.mockResolvedValue({
+        id: 'area-1',
+        isActive: true,
+      });
+      const entry: WhitelistEntry = makeFakeEntry({
+        birthdate: new Date('1995-10-15T00:00:00Z'),
+        areaId: 'area-1',
+      });
+      prisma.whitelistEntry.update.mockResolvedValue(entry);
+
+      const result = asUnknown<WhitelistEntry>(
+        await service.update('uuid-1', {
+          birthdate: '1995-10-15',
+          areaId: 'area-1',
+        }),
+      );
+
+      expect(prisma.whitelistEntry.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'uuid-1' },
+          data: expect.objectContaining({
+            birthdate: new Date('1995-10-15T00:00:00Z'),
+            areaId: 'area-1',
+          }),
+        }),
+      );
+    });
   });
 
   /* ═══════════════════════════════════════════════
@@ -409,10 +527,12 @@ describe('WhitelistService', () => {
   });
 
   /* ═══════════════════════════════════════════════
-   *  BULK CREATE
+   *  BULK CREATE (BULK UPSERT)
    * ═══════════════════════════════════════════════ */
   describe('bulkCreate', () => {
-    function makeXlsxBuffer(rows: Array<Record<string, string>>): Buffer {
+    function makeXlsxBuffer(
+      rows: Array<Record<string, string | Date | number>>,
+    ): Buffer {
       const ws = XLSX.utils.json_to_sheet(rows);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
@@ -427,25 +547,29 @@ describe('WhitelistService', () => {
     }
 
     it('should bulk create entries from xlsx buffer', async () => {
-      prisma.whitelistEntry.createMany.mockResolvedValue({ count: 2 });
+      prisma.whitelistEntry.findMany.mockResolvedValue([]);
+      prisma.area.findMany.mockResolvedValue([
+        { id: 'area-1', name: 'Pintura' },
+      ]);
+      prisma._txMock.whitelistEntry.createMany.mockResolvedValue({ count: 2 });
 
       const buffer = makeXlsxBuffer([
-        { cc: '111', name: 'Alice' },
+        { cc: '111', name: 'Alice', area: 'Pintura', birthdate: '1995-10-15' },
         { cc: '222', name: 'Bob' },
       ]);
 
-      const result = asUnknown<BulkCreateResult>(
-        await service.bulkCreate(buffer),
-      );
+      const result = asUnknown<any>(await service.bulkCreate(buffer));
 
       expect(result.created).toBe(2);
-      expect(result.skipped).toBe(0);
+      expect(result.updated).toBe(0);
       expect(result.errors).toHaveLength(0);
-      expect(prisma.whitelistEntry.createMany).toHaveBeenCalledTimes(1);
+      expect(prisma._txMock.whitelistEntry.createMany).toHaveBeenCalledTimes(1);
     });
 
     it('should report validation errors for invalid rows', async () => {
-      prisma.whitelistEntry.createMany.mockResolvedValue({ count: 1 });
+      prisma.whitelistEntry.findMany.mockResolvedValue([]);
+      prisma.area.findMany.mockResolvedValue([]);
+      prisma._txMock.whitelistEntry.createMany.mockResolvedValue({ count: 1 });
 
       const buffer = makeXlsxBuffer([
         { cc: '', name: 'No CC' },
@@ -453,9 +577,7 @@ describe('WhitelistService', () => {
         { cc: '444', name: 'Valid Entry' },
       ]);
 
-      const result = asUnknown<BulkCreateResult>(
-        await service.bulkCreate(buffer),
-      );
+      const result = asUnknown<any>(await service.bulkCreate(buffer));
 
       expect(result.errors).toHaveLength(2);
       expect(result.created).toBe(1);
@@ -467,29 +589,39 @@ describe('WhitelistService', () => {
         { cc: 'x', name: 'y' },
       ]);
 
-      const result = asUnknown<BulkCreateResult>(
-        await service.bulkCreate(buffer),
-      );
+      const result = asUnknown<any>(await service.bulkCreate(buffer));
 
       expect(result.created).toBe(0);
-      expect(prisma.whitelistEntry.createMany).not.toHaveBeenCalled();
+      expect(prisma._txMock.whitelistEntry.createMany).not.toHaveBeenCalled();
     });
 
-    it('should count skipped duplicates correctly', async () => {
-      prisma.whitelistEntry.createMany.mockResolvedValue({ count: 2 });
+    it('should perform upserts on existing CCs correctly', async () => {
+      prisma.whitelistEntry.findMany.mockResolvedValue([
+        { cc: '111', id: 'uuid-existing-alice' },
+      ]);
+      prisma.area.findMany.mockResolvedValue([]);
+      prisma._txMock.whitelistEntry.createMany.mockResolvedValue({ count: 1 });
+      prisma._txMock.whitelistEntry.update.mockResolvedValue({});
 
       const buffer = makeXlsxBuffer([
-        { cc: '111', name: 'Alice' },
+        { cc: '111', name: 'Alice Updated', birthdate: '1995-12-25' },
         { cc: '222', name: 'Bob' },
-        { cc: '111', name: 'Alice Dup' },
       ]);
 
-      const result = asUnknown<BulkCreateResult>(
-        await service.bulkCreate(buffer),
-      );
+      const result = asUnknown<any>(await service.bulkCreate(buffer));
 
-      expect(result.created).toBe(2);
-      expect(result.skipped).toBe(1);
+      expect(result.created).toBe(1);
+      expect(result.updated).toBe(1);
+      expect(prisma._txMock.whitelistEntry.update).toHaveBeenCalledTimes(1);
+      expect(prisma._txMock.whitelistEntry.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'uuid-existing-alice' },
+          data: expect.objectContaining({
+            name: 'Alice Updated',
+            birthdate: new Date('1995-12-25T00:00:00Z'),
+          }),
+        }),
+      );
     });
   });
 });
