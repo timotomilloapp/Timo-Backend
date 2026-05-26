@@ -1,6 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { AppetizerStatus } from '@prisma/client';
 import {
   IsDateString,
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
@@ -42,4 +44,13 @@ export class UpdateAppetizerDto {
   @IsOptional()
   @IsString()
   observations?: string;
+
+  @ApiPropertyOptional({
+    enum: AppetizerStatus,
+    example: AppetizerStatus.PENDIENTE,
+    description: 'Status of the appetizer request',
+  })
+  @IsOptional()
+  @IsEnum(AppetizerStatus)
+  status?: AppetizerStatus;
 }

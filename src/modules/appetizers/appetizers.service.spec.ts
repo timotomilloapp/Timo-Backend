@@ -6,6 +6,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { tomorrowColombia } from '../../common/date.util';
 
 /* ───────── Prisma mock ───────── */
 const mockPrisma = () => ({
@@ -29,8 +30,9 @@ const fakeAppetizer = (
   id: 'appetizer-1',
   quantity: 10,
   areaId: 'area-1',
-  date: new Date('2026-03-01T00:00:00Z'),
+  date: new Date(tomorrowColombia() + 'T00:00:00Z'),
   observations: 'Some observations',
+  status: 'PENDIENTE',
   createdAt: new Date('2026-01-01T00:00:00Z'),
   updatedAt: new Date('2026-01-01T00:00:00Z'),
   area: {
@@ -74,7 +76,7 @@ describe('AppetizersService', () => {
       const result = await service.create({
         quantity: 10,
         areaId: 'area-1',
-        date: '2026-03-01',
+        date: tomorrowColombia(),
         observations: 'Some observations',
       });
 
@@ -88,7 +90,7 @@ describe('AppetizersService', () => {
           data: expect.objectContaining({
             quantity: 10,
             areaId: 'area-1',
-            date: new Date('2026-03-01T00:00:00Z'),
+            date: new Date(tomorrowColombia() + 'T00:00:00Z'),
             observations: 'Some observations',
           }) as Record<string, unknown>,
         }),
@@ -102,7 +104,7 @@ describe('AppetizersService', () => {
         service.create({
           quantity: 10,
           areaId: 'nope',
-          date: '2026-03-01',
+          date: tomorrowColombia(),
         }),
       ).rejects.toThrow(NotFoundException);
     });
@@ -117,7 +119,7 @@ describe('AppetizersService', () => {
         service.create({
           quantity: 10,
           areaId: 'area-1',
-          date: '2026-03-01',
+          date: tomorrowColombia(),
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -153,14 +155,14 @@ describe('AppetizersService', () => {
     it('should filter by date', async () => {
       prisma.appetizer.findMany.mockResolvedValue([]);
 
-      await service.findAll({ date: '2026-03-01' });
+      await service.findAll({ date: tomorrowColombia() });
 
       const call = prisma.appetizer.findMany.mock.calls[0][0] as {
         where: Record<string, unknown>;
       };
       expect(call.where).toHaveProperty(
         'date',
-        new Date('2026-03-01T00:00:00Z'),
+        new Date(tomorrowColombia() + 'T00:00:00Z'),
       );
     });
 
@@ -178,8 +180,8 @@ describe('AppetizersService', () => {
       });
     });
 
-    it('should throw BadRequestException when take > 200', async () => {
-      await expect(service.findAll({ take: 201 })).rejects.toThrow(
+    it('should throw BadRequestException when take > 1000', async () => {
+      await expect(service.findAll({ take: 1001 })).rejects.toThrow(
         BadRequestException,
       );
     });
@@ -208,7 +210,10 @@ describe('AppetizersService', () => {
    * ═══════════════════════════════════════════════ */
   describe('update', () => {
     it('should update appetizer fields', async () => {
-      prisma.appetizer.findUnique.mockResolvedValue({ id: 'appetizer-1' });
+      prisma.appetizer.findUnique.mockResolvedValue({
+        id: 'appetizer-1',
+        date: new Date(tomorrowColombia() + 'T00:00:00Z'),
+      });
       prisma.area.findUnique.mockResolvedValue({
         id: 'area-2',
         isActive: true,
@@ -242,7 +247,10 @@ describe('AppetizersService', () => {
     });
 
     it('should throw NotFoundException if updated Area does not exist', async () => {
-      prisma.appetizer.findUnique.mockResolvedValue({ id: 'appetizer-1' });
+      prisma.appetizer.findUnique.mockResolvedValue({
+        id: 'appetizer-1',
+        date: new Date(tomorrowColombia() + 'T00:00:00Z'),
+      });
       prisma.area.findUnique.mockResolvedValue(null);
 
       await expect(
@@ -251,7 +259,10 @@ describe('AppetizersService', () => {
     });
 
     it('should throw BadRequestException if updated Area is inactive', async () => {
-      prisma.appetizer.findUnique.mockResolvedValue({ id: 'appetizer-1' });
+      prisma.appetizer.findUnique.mockResolvedValue({
+        id: 'appetizer-1',
+        date: new Date(tomorrowColombia() + 'T00:00:00Z'),
+      });
       prisma.area.findUnique.mockResolvedValue({
         id: 'area-2',
         isActive: false,
@@ -268,7 +279,10 @@ describe('AppetizersService', () => {
    * ═══════════════════════════════════════════════ */
   describe('delete', () => {
     it('should delete and return true representation', async () => {
-      prisma.appetizer.findUnique.mockResolvedValue({ id: 'appetizer-1' });
+      prisma.appetizer.findUnique.mockResolvedValue({
+        id: 'appetizer-1',
+        date: new Date(tomorrowColombia() + 'T00:00:00Z'),
+      });
       prisma.appetizer.delete.mockResolvedValue(undefined);
 
       expect(await service.delete('appetizer-1')).toEqual({

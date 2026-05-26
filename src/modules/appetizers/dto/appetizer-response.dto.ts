@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { AreaResponseDto } from '../../areas/dto/area-response.dto';
+import { AppetizerStatus } from '@prisma/client';
 
 export class AppetizerResponseDto {
   @ApiProperty({ example: 'uuid' })
@@ -19,6 +20,9 @@ export class AppetizerResponseDto {
 
   @ApiProperty({ example: 'Observaciones de aperitivos' })
   observations!: string;
+
+  @ApiProperty({ enum: AppetizerStatus, example: AppetizerStatus.PENDIENTE })
+  status!: AppetizerStatus;
 
   @ApiProperty({ example: '2026-02-20T00:00:00.000Z' })
   createdAt!: Date;

@@ -215,15 +215,21 @@ model Area {
   @@map("areas")
 }
 
+enum AppetizerStatus {
+  PENDIENTE
+  ENTREGADO
+}
+
 model Appetizer {
-  id           String   @id @default(uuid()) @db.Uuid
+  id           String          @id @default(uuid()) @db.Uuid
   quantity     Int
-  areaId       String   @db.Uuid
-  area         Area     @relation(fields: [areaId], references: [id])
-  date         DateTime @db.Date
-  observations String   @db.Text
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  areaId       String          @db.Uuid
+  area         Area            @relation(fields: [areaId], references: [id])
+  date         DateTime        @db.Date
+  observations String          @db.Text
+  status       AppetizerStatus @default(PENDIENTE)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
   @@map("appetizers")
   @@index([areaId])

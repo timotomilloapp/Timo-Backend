@@ -7,7 +7,12 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateAppetizerDto } from './dto/create-appetizer.dto';
 import { UpdateAppetizerDto } from './dto/update-appetizer.dto';
-import { colombiaTimestamps, colombiaUpdatedAt } from '../../common/date.util';
+import {
+  colombiaTimestamps,
+  colombiaUpdatedAt,
+  isDateTomorrowOrLaterColombia,
+  todayColombia,
+} from '../../common/date.util';
 
 @Injectable()
 export class AppetizersService {
@@ -30,6 +35,11 @@ export class AppetizersService {
       throw new BadRequestException('Referenced area is inactive');
 
     const targetDateStr = dto.date.split('T')[0];
+    if (!isDateTomorrowOrLaterColombia(targetDateStr)) {
+      throw new BadRequestException(
+        'Las solicitudes de aperitivos solo están permitidas para el día de mañana en adelante (Colombia timezone).',
+      );
+    }
 
     return this.prisma.appetizer.create({
       data: {
@@ -37,6 +47,7 @@ export class AppetizersService {
         areaId: dto.areaId,
         date: new Date(targetDateStr + 'T00:00:00Z'),
         observations: dto.observations?.trim() ?? '',
+        status: 'PENDIENTE',
         ...colombiaTimestamps(),
       },
       include: {
@@ -62,7 +73,7 @@ export class AppetizersService {
   }) {
     const { q, date, areaId, skip = 0, take = 50 } = params;
 
-    if (take > 200) throw new BadRequestException('take max is 200');
+    if (take > 1000) throw new BadRequestException('take max is 1000');
 
     const where: any = {};
 
@@ -123,9 +134,16 @@ export class AppetizersService {
 
     const exists = await this.prisma.appetizer.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, date: true },
     });
     if (!exists) throw new NotFoundException('Appetizer request not found');
+
+    const currentDateStr = exists.date.toISOString().slice(0, 10);
+    if (!isDateTomorrowOrLaterColombia(currentDateStr)) {
+      throw new BadRequestException(
+        'No se puede actualizar una solicitud de aperitivo para el día de hoy o fechas pasadas.',
+      );
+    }
 
     const data: any = {};
 
@@ -146,11 +164,20 @@ export class AppetizersService {
 
     if (dto.date !== undefined) {
       const targetDateStr = dto.date.split('T')[0];
+      if (!isDateTomorrowOrLaterColombia(targetDateStr)) {
+        throw new BadRequestException(
+          'La nueva fecha de solicitud debe ser de mañana en adelante.',
+        );
+      }
       data.date = new Date(targetDateStr + 'T00:00:00Z');
     }
 
     if (dto.observations !== undefined) {
       data.observations = dto.observations.trim();
+    }
+
+    if (dto.status !== undefined) {
+      data.status = dto.status;
     }
 
     return this.prisma.appetizer.update({
@@ -178,11 +205,40 @@ export class AppetizersService {
 
     const exists = await this.prisma.appetizer.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, date: true },
     });
     if (!exists) throw new NotFoundException('Appetizer request not found');
 
+    const currentDateStr = exists.date.toISOString().slice(0, 10);
+    if (!isDateTomorrowOrLaterColombia(currentDateStr)) {
+      throw new BadRequestException(
+        'No se puede eliminar una solicitud de aperitivo para el día de hoy o fechas pasadas.',
+      );
+    }
+
     await this.prisma.appetizer.delete({ where: { id } });
     return { deleted: true, id };
+  }
+
+  async updateCurrentDayAppetizersStatus() {
+    this.logger.log('UPDATE current day appetizers status to ENTREGADO');
+    const todayStr = todayColombia();
+    const date = new Date(todayStr + 'T00:00:00Z');
+
+    const result = await this.prisma.appetizer.updateMany({
+      where: {
+        date,
+        status: 'PENDIENTE',
+      },
+      data: {
+        status: 'ENTREGADO',
+        ...colombiaUpdatedAt(),
+      },
+    });
+
+    this.logger.log(
+      `Updated ${result.count} appetizer(s) to ENTREGADO status for date=${todayStr}`,
+    );
+    return result;
   }
 }
