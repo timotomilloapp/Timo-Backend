@@ -113,8 +113,9 @@ export class MenusService {
     take?: number;
     startDate?: string;
     endDate?: string;
+    cc?: string;
   }) {
-    const { skip = 0, take = 50, startDate, endDate } = params;
+    const { skip = 0, take = 50, startDate, endDate, cc } = params;
 
     if (take > 200) throw new BadRequestException('take max is 200');
 
@@ -126,12 +127,45 @@ export class MenusService {
       where.date = { ...where.date, lte: new Date(endDate + 'T23:59:59Z') };
     }
 
-    return this.prisma.menu.findMany({
+    const menus = await this.prisma.menu.findMany({
       where,
       orderBy: { date: 'desc' },
       skip,
       take,
       include: INCLUDE_RELATIONS,
+    });
+
+    if (!cc) {
+      return menus;
+    }
+
+    const menuIds = menus.map((m) => m.id);
+    const reservations = await this.prisma.reservation.findMany({
+      where: {
+        menuId: { in: menuIds },
+        cc: cc.trim(),
+      },
+      select: {
+        id: true,
+        menuId: true,
+        proteinTypeId: true,
+        printedAt: true,
+      },
+    });
+
+    const reservationsMap = new Map(
+      reservations.map((r) => [r.menuId, r]),
+    );
+
+    return menus.map((menu) => {
+      const res = reservationsMap.get(menu.id);
+      return {
+        ...menu,
+        hasReservation: !!res,
+        reservationId: res ? res.id : null,
+        reservedProteinId: res ? res.proteinTypeId : null,
+        isPrinted: !!res?.printedAt,
+      };
     });
   }
 

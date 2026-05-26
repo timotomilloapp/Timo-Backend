@@ -90,6 +90,12 @@ export class MenusController {
     type: String,
     description: 'Filter by end date (YYYY-MM-DD)',
   })
+  @ApiQuery({
+    name: 'cc',
+    required: false,
+    type: String,
+    description: 'Filter reservations for a specific user CC',
+  })
   @ApiBadRequestResponse({
     description: 'Invalid query params (e.g., take > 200)',
   })
@@ -98,8 +104,9 @@ export class MenusController {
     @Query('take', new ParseIntPipe({ optional: true })) take?: number,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
-  ): Promise<MenuResponseDto[]> {
-    return this.menus.findAll({ skip, take, startDate, endDate });
+    @Query('cc') cc?: string,
+  ): Promise<any[]> {
+    return this.menus.findAll({ skip, take, startDate, endDate, cc });
   }
 
   @Get('by-date/:date')

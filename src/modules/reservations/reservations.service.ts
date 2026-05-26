@@ -357,8 +357,10 @@ export class ReservationsService {
   async findByCC(cc: string, date?: string) {
     cc = cc.trim();
 
-    const where: { cc: string; menu?: { date: Date } } = { cc };
-    if (date) {
+    const where: any = { cc };
+    if (date === 'all') {
+      // Do not filter by date
+    } else if (date) {
       where.menu = { date: new Date(date + 'T00:00:00Z') };
     } else {
       where.menu = { date: new Date(todayColombia() + 'T00:00:00Z') };
