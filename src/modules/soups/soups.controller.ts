@@ -40,7 +40,7 @@ import { SoupResponseDto } from './dto/soup-response.dto';
 @UseGuards(JwtAuthGuard)
 @Controller('soups')
 export class SoupsController {
-  constructor(private readonly soups: SoupsService) { }
+  constructor(private readonly soups: SoupsService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create soup' })

@@ -1,15 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, MaxLength, MinLength } from 'class-validator';
 
-export class WhitelistLoginDto {
+export class UpdateAreaDto {
   @ApiProperty({
-    example: '1234567890',
-    description: 'Cédula (identification number) to authenticate',
+    example: 'Pintura Especial',
+    description: 'Updated name of the area',
     minLength: 2,
-    maxLength: 20,
+    maxLength: 80,
   })
   @IsString()
   @MinLength(2)
-  @MaxLength(20)
-  cc!: string;
+  @MaxLength(80)
+  name!: string;
 }

@@ -38,7 +38,7 @@ import { ReservationSummaryDto } from './dto/reservation-summary.dto';
 @ApiTags('Reservations')
 @Controller('reservations')
 export class ReservationsController {
-  constructor(private readonly reservations: ReservationsService) { }
+  constructor(private readonly reservations: ReservationsService) {}
 
   /* ───────── PUBLIC ENDPOINTS (by CC) ───────── */
 
@@ -213,7 +213,10 @@ export class ReservationsController {
   }
 
   @Patch(':id/printed')
-  @ApiOperation({ summary: 'Mark reservation ticket as printed (public - triggered by user print)' })
+  @ApiOperation({
+    summary:
+      'Mark reservation ticket as printed (public - triggered by user print)',
+  })
   @ApiParam({ name: 'id', description: 'Reservation UUID' })
   @ApiOkResponse({
     description: 'Reservation marked as printed',
@@ -221,18 +224,27 @@ export class ReservationsController {
   })
   @ApiNotFoundResponse({ description: 'Reservation not found' })
   markAsPrinted(@Param('id') id: string): Promise<ReservationResponseDto> {
-    return this.reservations.markAsPrinted(id) as Promise<ReservationResponseDto>;
+    return this.reservations.markAsPrinted(
+      id,
+    ) as Promise<ReservationResponseDto>;
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete reservation (public - uses CC)' })
   @ApiParam({ name: 'id', description: 'Reservation UUID' })
-  @ApiQuery({ name: 'cc', description: 'User document (CC) to verify ownership', required: true })
+  @ApiQuery({
+    name: 'cc',
+    description: 'User document (CC) to verify ownership',
+    required: true,
+  })
   @ApiNoContentResponse({ description: 'Reservation deleted' })
   @ApiNotFoundResponse({ description: 'Reservation not found' })
   @ApiForbiddenResponse({ description: 'CC does not match reservation owner' })
-  async delete(@Param('id') id: string, @Query('cc') cc: string): Promise<void> {
+  async delete(
+    @Param('id') id: string,
+    @Query('cc') cc: string,
+  ): Promise<void> {
     await this.reservations.delete(id, cc);
   }
 

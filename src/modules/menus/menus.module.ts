@@ -9,4 +9,4 @@ import { MenusCronService } from './menus-cron.service';
   providers: [MenusService, PrismaService, MenusCronService],
   exports: [MenusService],
 })
-export class MenusModule { }
+export class MenusModule {}

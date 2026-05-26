@@ -401,7 +401,10 @@ describe('ReservationsService', () => {
    * ═══════════════════════════════════════════════ */
   describe('delete', () => {
     it('should delete and return { deleted: true, id }', async () => {
-      prisma.reservation.findUnique.mockResolvedValue({ id: 'res-1', cc: '123456' });
+      prisma.reservation.findUnique.mockResolvedValue({
+        id: 'res-1',
+        cc: '123456',
+      });
       prisma.reservation.delete.mockResolvedValue(undefined);
 
       expect(await service.delete('res-1', '123456')).toEqual({
@@ -413,13 +416,20 @@ describe('ReservationsService', () => {
     it('should throw NotFoundException when not found', async () => {
       prisma.reservation.findUnique.mockResolvedValue(null);
 
-      await expect(service.delete('nope', '123456')).rejects.toThrow(NotFoundException);
+      await expect(service.delete('nope', '123456')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw ForbiddenException on cc mismatch', async () => {
-      prisma.reservation.findUnique.mockResolvedValue({ id: 'res-1', cc: '999999' });
+      prisma.reservation.findUnique.mockResolvedValue({
+        id: 'res-1',
+        cc: '999999',
+      });
 
-      await expect(service.delete('res-1', '123456')).rejects.toThrow(ForbiddenException);
+      await expect(service.delete('res-1', '123456')).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 

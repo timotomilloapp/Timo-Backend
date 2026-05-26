@@ -1,4 +1,4 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsBoolean,
   IsOptional,
@@ -7,22 +7,22 @@ import {
   MinLength,
 } from 'class-validator';
 
-export class UpdateProteinDto {
-  @ApiPropertyOptional({
-    example: 'Pollo asado',
-    description: 'New name for the protein type',
+export class CreateAreaDto {
+  @ApiProperty({
+    example: 'Pintura',
+    description: 'Name of the area',
     minLength: 2,
     maxLength: 80,
   })
-  @IsOptional()
   @IsString()
   @MinLength(2)
   @MaxLength(80)
-  name?: string;
+  name!: string;
 
   @ApiPropertyOptional({
     example: true,
-    description: 'Active status of the protein type',
+    description: 'Indicates whether the area is active',
+    default: true,
   })
   @IsOptional()
   @IsBoolean()

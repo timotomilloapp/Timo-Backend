@@ -26,7 +26,7 @@ const SELECT_FIELDS = {
 export class WhitelistService {
   private readonly logger = new Logger(WhitelistService.name);
 
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateWhitelistDto) {
     const cc = dto.cc?.trim();
@@ -61,11 +61,11 @@ export class WhitelistService {
       ...(typeof enabled === 'boolean' ? { enabled } : {}),
       ...(q?.trim()
         ? {
-          OR: [
-            { name: { contains: q.trim(), mode: 'insensitive' as const } },
-            { cc: { contains: q.trim(), mode: 'insensitive' as const } },
-          ],
-        }
+            OR: [
+              { name: { contains: q.trim(), mode: 'insensitive' as const } },
+              { cc: { contains: q.trim(), mode: 'insensitive' as const } },
+            ],
+          }
         : {}),
     };
 
@@ -77,7 +77,7 @@ export class WhitelistService {
         skip,
         take,
         select: SELECT_FIELDS,
-      })
+      }),
     ]);
 
     return { data, total };
@@ -195,17 +195,25 @@ export class WhitelistService {
 
     if (rows.length === 0) {
       this.logger.warn('Bulk upload failed: Empty file or invalid format');
-      throw new BadRequestException('El archivo está vacío o no tiene formato válido de tabla.');
+      throw new BadRequestException(
+        'El archivo está vacío o no tiene formato válido de tabla.',
+      );
     }
 
     // Check headers intuitively by sampling the first row
     const firstRow = rows[0];
-    const hasCCHeader = Object.keys(firstRow).some(key => key.toLowerCase() === 'cc');
-    const hasNameHeader = Object.keys(firstRow).some(key => key.toLowerCase() === 'name' || key.toLowerCase() === 'nombre');
+    const hasCCHeader = Object.keys(firstRow).some(
+      (key) => key.toLowerCase() === 'cc',
+    );
+    const hasNameHeader = Object.keys(firstRow).some(
+      (key) => key.toLowerCase() === 'name' || key.toLowerCase() === 'nombre',
+    );
 
     if (!hasCCHeader || !hasNameHeader) {
       this.logger.warn('Bulk upload failed: Missing required columns');
-      throw new BadRequestException('El archivo debe contener las columnas "cc" y "name" (o "nombre").');
+      throw new BadRequestException(
+        'El archivo debe contener las columnas "cc" y "name" (o "nombre").',
+      );
     }
 
     this.logger.log(`Parsed ${rows.length} rows from uploaded file`);
@@ -218,11 +226,11 @@ export class WhitelistService {
       const cc = String(row['cc'] ?? row['CC'] ?? row['Cc'] ?? '').trim();
       const name = String(
         row['name'] ??
-        row['Name'] ??
-        row['NAME'] ??
-        row['nombre'] ??
-        row['Nombre'] ??
-        '',
+          row['Name'] ??
+          row['NAME'] ??
+          row['nombre'] ??
+          row['Nombre'] ??
+          '',
       ).trim();
 
       if (!cc || cc.length < 2) {
@@ -242,7 +250,9 @@ export class WhitelistService {
     }
 
     if (validEntries.length === 0) {
-      this.logger.warn(`Bulk process finished with 0 valid entries out of ${rows.length} total rows. Errors: ${errors.length}`);
+      this.logger.warn(
+        `Bulk process finished with 0 valid entries out of ${rows.length} total rows. Errors: ${errors.length}`,
+      );
       return { created: 0, skipped: 0, errors };
     }
 
@@ -255,7 +265,7 @@ export class WhitelistService {
     const skipped = validEntries.length - result.count;
 
     this.logger.log(
-      `Bulk process completed. Created: ${result.count}, Skipped (duplicates): ${skipped}, Invalid Rows: ${errors.length}`
+      `Bulk process completed. Created: ${result.count}, Skipped (duplicates): ${skipped}, Invalid Rows: ${errors.length}`,
     );
 
     return {

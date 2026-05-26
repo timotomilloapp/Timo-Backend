@@ -38,7 +38,7 @@ const INCLUDE_RELATIONS = {
 export class ReservationsService {
   private readonly logger = new Logger(ReservationsService.name);
 
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   /* ───────── helpers ───────── */
 
@@ -202,7 +202,9 @@ export class ReservationsService {
     }
 
     if (reservation.printedAt) {
-      throw new BadRequestException('El ticket ya fue impreso y la reservación no puede ser modificada');
+      throw new BadRequestException(
+        'El ticket ya fue impreso y la reservación no puede ser modificada',
+      );
     }
 
     // Validate protein is in menu options
@@ -319,8 +321,12 @@ export class ReservationsService {
     }
 
     if (reservation.cc !== cc) {
-      this.logger.warn(`DELETE rejected — id=${id} cc=${cc} ownership mismatch`);
-      throw new ForbiddenException('This reservation does not belong to the provided CC');
+      this.logger.warn(
+        `DELETE rejected — id=${id} cc=${cc} ownership mismatch`,
+      );
+      throw new ForbiddenException(
+        'This reservation does not belong to the provided CC',
+      );
     }
 
     await this.prisma.reservation.delete({ where: { id } });
@@ -395,7 +401,9 @@ export class ReservationsService {
     });
 
     // Determine global status from reservations
-    const statuses = new Set(reservations.map((r: { status: string }) => r.status));
+    const statuses = new Set(
+      reservations.map((r: { status: string }) => r.status),
+    );
     let globalStatus = 'SIN_RESERVAS';
     if (statuses.has('SERVIDA')) globalStatus = 'SERVIDA';
     else if (statuses.has('RESERVADA') || statuses.has('AUTO_ASIGNADA'))

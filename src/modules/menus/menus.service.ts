@@ -54,7 +54,7 @@ function deriveDayOfWeek(dateStr: string): DayOfWeek {
 export class MenusService {
   private readonly logger = new Logger(MenusService.name);
 
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateMenuDto) {
     this.logger.log(`CREATE menu — date=${dto.date}`);
@@ -76,10 +76,10 @@ export class MenusService {
           defaultProteinTypeId,
           proteinOptions: dto.proteinOptionIds?.length
             ? {
-              create: dto.proteinOptionIds.map((id) => ({
-                proteinTypeId: id,
-              })),
-            }
+                create: dto.proteinOptionIds.map((id) => ({
+                  proteinTypeId: id,
+                })),
+              }
             : undefined,
           sideOptions: dto.sideOptionIds?.length
             ? { create: dto.sideOptionIds.map((id) => ({ sideDishId: id })) }
@@ -108,7 +108,12 @@ export class MenusService {
     this.logger.log(`CREATE menu success — date=${dto.date}`);
   }
 
-  async findAll(params: { skip?: number; take?: number; startDate?: string; endDate?: string }) {
+  async findAll(params: {
+    skip?: number;
+    take?: number;
+    startDate?: string;
+    endDate?: string;
+  }) {
     const { skip = 0, take = 50, startDate, endDate } = params;
 
     if (take > 200) throw new BadRequestException('take max is 200');
@@ -164,7 +169,7 @@ export class MenusService {
         id: true,
         proteinTypeId: true,
         printedAt: true,
-      }
+      },
     });
 
     return {
@@ -206,21 +211,19 @@ export class MenusService {
           defaultProteinTypeId: source.defaultProteinTypeId,
           proteinOptions: source.proteinOptions.length
             ? {
-              create: source.proteinOptions.map(
-                (o: { proteinTypeId: string }) => ({
-                  proteinTypeId: o.proteinTypeId,
-                }),
-              ),
-            }
+                create: source.proteinOptions.map(
+                  (o: { proteinTypeId: string }) => ({
+                    proteinTypeId: o.proteinTypeId,
+                  }),
+                ),
+              }
             : undefined,
           sideOptions: source.sideOptions.length
             ? {
-              create: source.sideOptions.map(
-                (o: { sideDishId: string }) => ({
+                create: source.sideOptions.map((o: { sideDishId: string }) => ({
                   sideDishId: o.sideDishId,
-                }),
-              ),
-            }
+                })),
+              }
             : undefined,
           ...colombiaTimestamps(),
         },
@@ -348,7 +351,9 @@ export class MenusService {
       },
     });
 
-    this.logger.log(`Updated ${result.count} menu(s) to SERVED status for date=${todayStr}`);
+    this.logger.log(
+      `Updated ${result.count} menu(s) to SERVED status for date=${todayStr}`,
+    );
     return result;
   }
 

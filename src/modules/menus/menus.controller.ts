@@ -38,7 +38,7 @@ import { UserMenuResponseDto } from './dto/user-menu-response.dto';
 @ApiTags('Menus')
 @Controller('menus')
 export class MenusController {
-  constructor(private readonly menus: MenusService) { }
+  constructor(private readonly menus: MenusService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -115,7 +115,9 @@ export class MenusController {
   }
 
   @Get('by-date/:date/user/:cc')
-  @ApiOperation({ summary: 'Get menu by date with user reservation status (public)' })
+  @ApiOperation({
+    summary: 'Get menu by date with user reservation status (public)',
+  })
   @ApiParam({ name: 'date', description: 'Date in YYYY-MM-DD format' })
   @ApiParam({ name: 'cc', description: 'User document (CC)' })
   @ApiOkResponse({
@@ -127,7 +129,10 @@ export class MenusController {
     @Param('date') date: string,
     @Param('cc') cc: string,
   ): Promise<UserMenuResponseDto> {
-    return this.menus.findForUserByDate(date, cc) as Promise<UserMenuResponseDto>;
+    return this.menus.findForUserByDate(
+      date,
+      cc,
+    ) as Promise<UserMenuResponseDto>;
   }
 
   @Get(':id')

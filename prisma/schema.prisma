@@ -198,3 +198,30 @@ model ReservationSideDish {
   @@index([reservationId])
   @@index([sideDishId])
 }
+
+model Area {
+  id         String      @id @default(uuid()) @db.Uuid
+  name       String      @unique @db.VarChar(80)
+  isActive   Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  appetizers Appetizer[]
+
+  @@map("areas")
+}
+
+model Appetizer {
+  id           String   @id @default(uuid()) @db.Uuid
+  quantity     Int
+  areaId       String   @db.Uuid
+  area         Area     @relation(fields: [areaId], references: [id])
+  date         DateTime @db.Date
+  observations String   @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("appetizers")
+  @@index([areaId])
+  @@index([date])
+}
+
