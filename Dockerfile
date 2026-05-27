@@ -24,8 +24,11 @@ COPY prisma.config.ts ./
 ENV DIRECT_DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 
-# Install all dependencies (including devDependencies for building)
-RUN pnpm install --frozen-lockfile --config.ignore-scripts=false
+# Install all dependencies (ignoring scripts to bypass pnpm 10 strict policies)
+RUN pnpm install --frozen-lockfile --ignore-scripts
+
+# Generate Prisma Client manually since postinstall is ignored
+RUN npx prisma generate
 
 # Copy everything else
 COPY . .
