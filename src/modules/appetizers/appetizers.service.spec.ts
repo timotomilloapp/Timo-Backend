@@ -20,6 +20,9 @@ const mockPrisma = () => ({
   area: {
     findUnique: jest.fn(),
   },
+  profile: {
+    findUnique: jest.fn(),
+  },
 });
 
 type MockPrisma = ReturnType<typeof mockPrisma>;
@@ -218,13 +221,14 @@ describe('AppetizersService', () => {
         id: 'area-2',
         isActive: true,
       });
+      prisma.profile.findUnique.mockResolvedValue({ role: 'USER' });
       const updated = fakeAppetizer({ quantity: 15, areaId: 'area-2' });
       prisma.appetizer.update.mockResolvedValue(updated);
 
       const result = await service.update('appetizer-1', {
         quantity: 15,
         areaId: 'area-2',
-      });
+      }, 'user-1');
 
       expect(result).toEqual(updated);
       expect(prisma.appetizer.update).toHaveBeenCalledWith(
@@ -240,8 +244,9 @@ describe('AppetizersService', () => {
 
     it('should throw NotFoundException if appetizer does not exist', async () => {
       prisma.appetizer.findUnique.mockResolvedValue(null);
+      prisma.profile.findUnique.mockResolvedValue({ role: 'USER' });
 
-      await expect(service.update('nope', { quantity: 15 })).rejects.toThrow(
+      await expect(service.update('nope', { quantity: 15 }, 'user-1')).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -252,9 +257,10 @@ describe('AppetizersService', () => {
         date: new Date(tomorrowColombia() + 'T00:00:00Z'),
       });
       prisma.area.findUnique.mockResolvedValue(null);
+      prisma.profile.findUnique.mockResolvedValue({ role: 'USER' });
 
       await expect(
-        service.update('appetizer-1', { areaId: 'nope' }),
+        service.update('appetizer-1', { areaId: 'nope' }, 'user-1'),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -267,9 +273,10 @@ describe('AppetizersService', () => {
         id: 'area-2',
         isActive: false,
       });
+      prisma.profile.findUnique.mockResolvedValue({ role: 'USER' });
 
       await expect(
-        service.update('appetizer-1', { areaId: 'area-2' }),
+        service.update('appetizer-1', { areaId: 'area-2' }, 'user-1'),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -283,9 +290,10 @@ describe('AppetizersService', () => {
         id: 'appetizer-1',
         date: new Date(tomorrowColombia() + 'T00:00:00Z'),
       });
+      prisma.profile.findUnique.mockResolvedValue({ role: 'USER' });
       prisma.appetizer.delete.mockResolvedValue(undefined);
 
-      expect(await service.delete('appetizer-1')).toEqual({
+      expect(await service.delete('appetizer-1', 'user-1')).toEqual({
         deleted: true,
         id: 'appetizer-1',
       });
@@ -293,8 +301,9 @@ describe('AppetizersService', () => {
 
     it('should throw NotFoundException when not found', async () => {
       prisma.appetizer.findUnique.mockResolvedValue(null);
+      prisma.profile.findUnique.mockResolvedValue({ role: 'USER' });
 
-      await expect(service.delete('nope')).rejects.toThrow(NotFoundException);
+      await expect(service.delete('nope', 'user-1')).rejects.toThrow(NotFoundException);
     });
   });
 });
