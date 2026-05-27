@@ -450,15 +450,18 @@ export class WhitelistService {
       // 2. Individual Updates
       if (toUpdate.length > 0) {
         for (const item of toUpdate) {
+          const updateData: any = {
+            name: item.name,
+            enabled: true,
+            ...colombiaUpdatedAt(),
+          };
+          // Only update area and birthdate if their columns were present in the uploaded file
+          if (areaKey) updateData.areaId = item.areaId;
+          if (birthdateKey) updateData.birthdate = item.birthdate;
+
           await tx.whitelistEntry.update({
             where: { id: item.id },
-            data: {
-              name: item.name,
-              birthdate: item.birthdate,
-              areaId: item.areaId,
-              enabled: true,
-              ...colombiaUpdatedAt(),
-            },
+            data: updateData,
           });
           updatedCount++;
         }

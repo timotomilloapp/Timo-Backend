@@ -10,6 +10,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -128,8 +129,9 @@ export class AppetizersController {
   update(
     @Param('id') id: string,
     @Body() dto: UpdateAppetizerDto,
+    @Req() req: any,
   ): Promise<AppetizerResponseDto> {
-    return this.appetizers.update(id, dto);
+    return this.appetizers.update(id, dto, req.user?.sub);
   }
 
   @Delete(':id')
@@ -138,7 +140,10 @@ export class AppetizersController {
   @ApiParam({ name: 'id', description: 'Appetizer UUID' })
   @ApiNoContentResponse({ description: 'Appetizer order deleted' })
   @ApiNotFoundResponse({ description: 'Appetizer request not found' })
-  async delete(@Param('id') id: string): Promise<void> {
-    await this.appetizers.delete(id);
+  async delete(
+    @Param('id') id: string,
+    @Req() req: any,
+  ): Promise<void> {
+    await this.appetizers.delete(id, req.user?.sub);
   }
 }
