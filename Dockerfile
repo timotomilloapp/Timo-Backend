@@ -25,7 +25,7 @@ ENV DIRECT_DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 
 # Install all dependencies (including devDependencies for building)
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --config.ignore-scripts=false
 
 # Copy everything else
 COPY . .
