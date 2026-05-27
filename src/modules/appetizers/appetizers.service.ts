@@ -129,7 +129,7 @@ export class AppetizersService {
     return item;
   }
 
-  async update(id: string, dto: UpdateAppetizerDto) {
+  async update(id: string, dto: UpdateAppetizerDto, userId: string) {
     this.logger.log(`UPDATE appetizer — id=${id}`);
 
     const exists = await this.prisma.appetizer.findUnique({
@@ -138,8 +138,19 @@ export class AppetizersService {
     });
     if (!exists) throw new NotFoundException('Appetizer request not found');
 
+    let isAdmin = false;
+    if (userId) {
+      const profile = await this.prisma.profile.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      });
+      if (profile && profile.role === 'ADMIN') {
+        isAdmin = true;
+      }
+    }
+
     const currentDateStr = exists.date.toISOString().slice(0, 10);
-    if (!isDateTomorrowOrLaterColombia(currentDateStr)) {
+    if (!isAdmin && !isDateTomorrowOrLaterColombia(currentDateStr)) {
       throw new BadRequestException(
         'No se puede actualizar una solicitud de aperitivo para el día de hoy o fechas pasadas.',
       );
@@ -164,7 +175,7 @@ export class AppetizersService {
 
     if (dto.date !== undefined) {
       const targetDateStr = dto.date.split('T')[0];
-      if (!isDateTomorrowOrLaterColombia(targetDateStr)) {
+      if (!isAdmin && !isDateTomorrowOrLaterColombia(targetDateStr)) {
         throw new BadRequestException(
           'La nueva fecha de solicitud debe ser de mañana en adelante.',
         );
@@ -200,7 +211,7 @@ export class AppetizersService {
     });
   }
 
-  async delete(id: string) {
+  async delete(id: string, userId: string) {
     this.logger.log(`DELETE appetizer — id=${id}`);
 
     const exists = await this.prisma.appetizer.findUnique({
@@ -209,8 +220,19 @@ export class AppetizersService {
     });
     if (!exists) throw new NotFoundException('Appetizer request not found');
 
+    let isAdmin = false;
+    if (userId) {
+      const profile = await this.prisma.profile.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      });
+      if (profile && profile.role === 'ADMIN') {
+        isAdmin = true;
+      }
+    }
+
     const currentDateStr = exists.date.toISOString().slice(0, 10);
-    if (!isDateTomorrowOrLaterColombia(currentDateStr)) {
+    if (!isAdmin && !isDateTomorrowOrLaterColombia(currentDateStr)) {
       throw new BadRequestException(
         'No se puede eliminar una solicitud de aperitivo para el día de hoy o fechas pasadas.',
       );
