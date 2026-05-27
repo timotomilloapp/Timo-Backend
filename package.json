@@ -94,5 +94,14 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@prisma/engines",
+      "prisma",
+      "@scarf/scarf",
+      "unrs-resolver"
+    ]
   }
 }
