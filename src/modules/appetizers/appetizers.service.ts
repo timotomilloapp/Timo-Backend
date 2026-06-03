@@ -35,11 +35,6 @@ export class AppetizersService {
       throw new BadRequestException('Referenced area is inactive');
 
     const targetDateStr = dto.date.split('T')[0];
-    if (!isDateTomorrowOrLaterColombia(targetDateStr)) {
-      throw new BadRequestException(
-        'Las solicitudes de aperitivos solo están permitidas para el día de mañana en adelante (Colombia timezone).',
-      );
-    }
 
     return this.prisma.appetizer.create({
       data: {

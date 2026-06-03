@@ -126,6 +126,31 @@ describe('AppetizersService', () => {
         }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('should successfully create an appetizer even for a past date', async () => {
+      prisma.area.findUnique.mockResolvedValue({
+        id: 'area-1',
+        isActive: true,
+      });
+      const pastDate = '2020-01-01';
+      const appetizer = fakeAppetizer({ date: new Date(pastDate + 'T00:00:00Z') });
+      prisma.appetizer.create.mockResolvedValue(appetizer);
+
+      const result = await service.create({
+        quantity: 5,
+        areaId: 'area-1',
+        date: pastDate,
+      });
+
+      expect(result).toEqual(appetizer);
+      expect(prisma.appetizer.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            date: new Date(pastDate + 'T00:00:00Z'),
+          }) as Record<string, unknown>,
+        }),
+      );
+    });
   });
 
   /* ═══════════════════════════════════════════════
