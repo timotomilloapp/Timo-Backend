@@ -1,34 +1,17 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { AppetizerStatus } from '@prisma/client';
+import { Type } from 'class-transformer';
 import {
   IsDateString,
   IsEnum,
-  IsInt,
   IsOptional,
   IsString,
-  IsUUID,
-  Min,
+  ValidateNested,
+  IsArray,
 } from 'class-validator';
+import { AppetizerDetailDto } from './create-appetizer.dto';
 
 export class UpdateAppetizerDto {
-  @ApiPropertyOptional({
-    example: 12,
-    description: 'Quantity of appetizers to order',
-    minimum: 1,
-  })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  quantity?: number;
-
-  @ApiPropertyOptional({
-    example: 'uuid',
-    description: 'Area UUID where the appetizer is requested',
-  })
-  @IsOptional()
-  @IsUUID()
-  areaId?: string;
-
   @ApiPropertyOptional({
     example: '2026-03-01',
     description: 'Date for which the appetizer is requested (YYYY-MM-DD)',
@@ -53,4 +36,14 @@ export class UpdateAppetizerDto {
   @IsOptional()
   @IsEnum(AppetizerStatus)
   status?: AppetizerStatus;
+
+  @ApiPropertyOptional({
+    type: [AppetizerDetailDto],
+    description: 'Breakdown of appetizer quantities per area',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AppetizerDetailDto)
+  details?: AppetizerDetailDto[];
 }

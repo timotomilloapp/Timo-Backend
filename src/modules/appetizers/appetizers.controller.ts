@@ -30,7 +30,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AppetizersService } from './appetizers.service';
 import { CreateAppetizerDto } from './dto/create-appetizer.dto';
 import { UpdateAppetizerDto } from './dto/update-appetizer.dto';
-import { AppetizerResponseDto } from './dto/appetizer-response.dto';
+import { AppetizerResponseDto, AppetizerDetailResponseDto } from './dto/appetizer-response.dto';
 
 @ApiTags('Appetizers')
 @ApiBearerAuth()
@@ -113,6 +113,19 @@ export class AppetizersController {
   @ApiNotFoundResponse({ description: 'Appetizer request not found' })
   findOne(@Param('id') id: string): Promise<AppetizerResponseDto> {
     return this.appetizers.findOne(id);
+  }
+
+  @Get(':id/details')
+  @ApiOperation({ summary: 'Get details of a specific appetizer request' })
+  @ApiParam({ name: 'id', description: 'Appetizer UUID' })
+  @ApiOkResponse({
+    description: 'List of appetizer details by area',
+    type: AppetizerDetailResponseDto,
+    isArray: true,
+  })
+  @ApiNotFoundResponse({ description: 'Appetizer request not found' })
+  findDetails(@Param('id') id: string): Promise<AppetizerDetailResponseDto[]> {
+    return this.appetizers.findDetails(id);
   }
 
   @Patch(':id')
