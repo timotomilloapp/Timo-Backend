@@ -204,12 +204,12 @@ model ReservationSideDish {
 }
 
 model Area {
-  id               String           @id @default(uuid()) @db.Uuid
-  name             String           @unique @db.VarChar(80)
-  isActive         Boolean          @default(true)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  appetizers       Appetizer[]
+  id               String            @id @default(uuid()) @db.Uuid
+  name             String            @unique @db.VarChar(80)
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  appetizerDetails AppetizerDetail[]
   whitelistEntries WhitelistEntry[]
 
   @@map("areas")
@@ -221,18 +221,28 @@ enum AppetizerStatus {
 }
 
 model Appetizer {
-  id           String          @id @default(uuid()) @db.Uuid
+  id           String            @id @default(uuid()) @db.Uuid
   quantity     Int
-  areaId       String          @db.Uuid
-  area         Area            @relation(fields: [areaId], references: [id])
-  date         DateTime        @db.Date
-  observations String          @db.Text
-  status       AppetizerStatus @default(PENDIENTE)
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  date         DateTime          @unique @db.Date
+  observations String            @db.Text
+  status       AppetizerStatus   @default(PENDIENTE)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  details      AppetizerDetail[]
 
   @@map("appetizers")
-  @@index([areaId])
   @@index([date])
+}
+
+model AppetizerDetail {
+  id          String    @id @default(uuid()) @db.Uuid
+  appetizerId String    @db.Uuid
+  appetizer   Appetizer @relation(fields: [appetizerId], references: [id], onDelete: Cascade)
+  areaId      String    @db.Uuid
+  area        Area      @relation(fields: [areaId], references: [id])
+  quantity    Int
+
+  @@unique([appetizerId, areaId])
+  @@map("appetizer_details")
 }
 

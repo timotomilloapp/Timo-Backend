@@ -22,40 +22,76 @@ export class AppetizersService {
 
   async create(dto: CreateAppetizerDto) {
     this.logger.log(
-      `CREATE appetizer — areaId=${dto.areaId} quantity=${dto.quantity}`,
+      `CREATE consolidated appetizer — date=${dto.date} detailsCount=${dto.details?.length}`,
     );
 
-    const area = await this.prisma.area.findUnique({
-      where: { id: dto.areaId },
+    const targetDateStr = dto.date.split('T')[0];
+    const targetDate = new Date(targetDateStr + 'T00:00:00Z');
+
+    // 1. Check uniqueness of date
+    const existing = await this.prisma.appetizer.findUnique({
+      where: { date: targetDate },
+      select: { id: true },
+    });
+    if (existing) {
+      throw new BadRequestException(
+        `Ya existe un registro de refrigerios para la fecha ${targetDateStr}.`,
+      );
+    }
+
+    // 2. Validate areas
+    const areaIds = dto.details.map((d) => d.areaId);
+    const uniqueAreaIds = [...new Set(areaIds)];
+    const areas = await this.prisma.area.findMany({
+      where: { id: { in: uniqueAreaIds } },
       select: { id: true, isActive: true },
     });
 
-    if (!area) throw new NotFoundException('Area not found');
-    if (!area.isActive)
-      throw new BadRequestException('Referenced area is inactive');
+    const activeAreaMap = new Map(areas.map((a) => [a.id, a.isActive]));
+    for (const id of uniqueAreaIds) {
+      if (!activeAreaMap.has(id)) {
+        throw new NotFoundException(`Área con ID ${id} no encontrada.`);
+      }
+      if (!activeAreaMap.get(id)) {
+        throw new BadRequestException(`El área con ID ${id} se encuentra inactiva.`);
+      }
+    }
 
-    const targetDateStr = dto.date.split('T')[0];
+    // 3. Calculate total quantity
+    const totalQuantity = dto.details.reduce((sum, d) => sum + d.quantity, 0);
 
-    return this.prisma.appetizer.create({
-      data: {
-        quantity: dto.quantity,
-        areaId: dto.areaId,
-        date: new Date(targetDateStr + 'T00:00:00Z'),
-        observations: dto.observations?.trim() ?? '',
-        status: 'PENDIENTE',
-        ...colombiaTimestamps(),
-      },
-      include: {
-        area: {
-          select: {
-            id: true,
-            name: true,
-            isActive: true,
-            createdAt: true,
-            updatedAt: true,
+    // 4. Create in transaction
+    return this.prisma.$transaction(async (tx) => {
+      return tx.appetizer.create({
+        data: {
+          quantity: totalQuantity,
+          date: targetDate,
+          observations: dto.observations?.trim() ?? '',
+          status: 'PENDIENTE',
+          ...colombiaTimestamps(),
+          details: {
+            create: dto.details.map((d) => ({
+              areaId: d.areaId,
+              quantity: d.quantity,
+            })),
           },
         },
-      },
+        include: {
+          details: {
+            include: {
+              area: {
+                select: {
+                  id: true,
+                  name: true,
+                  isActive: true,
+                  createdAt: true,
+                  updatedAt: true,
+                },
+              },
+            },
+          },
+        },
+      });
     });
   }
 
@@ -73,7 +109,11 @@ export class AppetizersService {
     const where: any = {};
 
     if (areaId) {
-      where.areaId = areaId;
+      where.details = {
+        some: {
+          areaId,
+        },
+      };
     }
 
     if (date) {
@@ -91,13 +131,17 @@ export class AppetizersService {
       skip,
       take,
       include: {
-        area: {
-          select: {
-            id: true,
-            name: true,
-            isActive: true,
-            createdAt: true,
-            updatedAt: true,
+        details: {
+          include: {
+            area: {
+              select: {
+                id: true,
+                name: true,
+                isActive: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            },
           },
         },
       },
@@ -108,13 +152,17 @@ export class AppetizersService {
     const item = await this.prisma.appetizer.findUnique({
       where: { id },
       include: {
-        area: {
-          select: {
-            id: true,
-            name: true,
-            isActive: true,
-            createdAt: true,
-            updatedAt: true,
+        details: {
+          include: {
+            area: {
+              select: {
+                id: true,
+                name: true,
+                isActive: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            },
           },
         },
       },
@@ -125,7 +173,7 @@ export class AppetizersService {
   }
 
   async update(id: string, dto: UpdateAppetizerDto, userId: string) {
-    this.logger.log(`UPDATE appetizer — id=${id}`);
+    this.logger.log(`UPDATE consolidated appetizer — id=${id}`);
 
     const exists = await this.prisma.appetizer.findUnique({
       where: { id },
@@ -153,21 +201,6 @@ export class AppetizersService {
 
     const data: any = {};
 
-    if (dto.quantity !== undefined) {
-      data.quantity = dto.quantity;
-    }
-
-    if (dto.areaId !== undefined) {
-      const area = await this.prisma.area.findUnique({
-        where: { id: dto.areaId },
-        select: { id: true, isActive: true },
-      });
-      if (!area) throw new NotFoundException('Area not found');
-      if (!area.isActive)
-        throw new BadRequestException('Referenced area is inactive');
-      data.areaId = dto.areaId;
-    }
-
     if (dto.date !== undefined) {
       const targetDateStr = dto.date.split('T')[0];
       if (!isAdmin && !isDateTomorrowOrLaterColombia(targetDateStr)) {
@@ -175,7 +208,22 @@ export class AppetizersService {
           'La nueva fecha de solicitud debe ser de mañana en adelante.',
         );
       }
-      data.date = new Date(targetDateStr + 'T00:00:00Z');
+      const targetDate = new Date(targetDateStr + 'T00:00:00Z');
+
+      const conflict = await this.prisma.appetizer.findFirst({
+        where: {
+          date: targetDate,
+          id: { not: id },
+        },
+        select: { id: true },
+      });
+      if (conflict) {
+        throw new BadRequestException(
+          `Ya existe un registro de refrigerios para la fecha ${targetDateStr}.`,
+        );
+      }
+
+      data.date = targetDate;
     }
 
     if (dto.observations !== undefined) {
@@ -186,6 +234,70 @@ export class AppetizersService {
       data.status = dto.status;
     }
 
+    if (dto.details !== undefined) {
+      // Validate areas in details
+      const areaIds = dto.details.map((d) => d.areaId);
+      const uniqueAreaIds = [...new Set(areaIds)];
+      const areas = await this.prisma.area.findMany({
+        where: { id: { in: uniqueAreaIds } },
+        select: { id: true, isActive: true },
+      });
+
+      const activeAreaMap = new Map(areas.map((a) => [a.id, a.isActive]));
+      for (const areaId of uniqueAreaIds) {
+        if (!activeAreaMap.has(areaId)) {
+          throw new NotFoundException(`Área con ID ${areaId} no encontrada.`);
+        }
+        if (!activeAreaMap.get(areaId)) {
+          throw new BadRequestException(`El área con ID ${areaId} se encuentra inactiva.`);
+        }
+      }
+
+      const totalQuantity = dto.details.reduce((sum, d) => sum + d.quantity, 0);
+
+      return this.prisma.$transaction(async (tx) => {
+        // Clear previous details
+        await tx.appetizerDetail.deleteMany({
+          where: { appetizerId: id },
+        });
+
+        // Insert new details
+        await tx.appetizerDetail.createMany({
+          data: dto.details!.map((d) => ({
+            appetizerId: id,
+            areaId: d.areaId,
+            quantity: d.quantity,
+          })),
+        });
+
+        // Update appetizer
+        return tx.appetizer.update({
+          where: { id },
+          data: {
+            ...data,
+            quantity: totalQuantity,
+            ...colombiaUpdatedAt(),
+          },
+          include: {
+            details: {
+              include: {
+                area: {
+                  select: {
+                    id: true,
+                    name: true,
+                    isActive: true,
+                    createdAt: true,
+                    updatedAt: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+      });
+    }
+
+    // No details update
     return this.prisma.appetizer.update({
       where: { id },
       data: {
@@ -193,13 +305,17 @@ export class AppetizersService {
         ...colombiaUpdatedAt(),
       },
       include: {
-        area: {
-          select: {
-            id: true,
-            name: true,
-            isActive: true,
-            createdAt: true,
-            updatedAt: true,
+        details: {
+          include: {
+            area: {
+              select: {
+                id: true,
+                name: true,
+                isActive: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            },
           },
         },
       },
@@ -235,6 +351,29 @@ export class AppetizersService {
 
     await this.prisma.appetizer.delete({ where: { id } });
     return { deleted: true, id };
+  }
+
+  async findDetails(appetizerId: string) {
+    const exists = await this.prisma.appetizer.findUnique({
+      where: { id: appetizerId },
+      select: { id: true },
+    });
+    if (!exists) throw new NotFoundException('Appetizer request not found');
+
+    return this.prisma.appetizerDetail.findMany({
+      where: { appetizerId },
+      include: {
+        area: {
+          select: {
+            id: true,
+            name: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
+    });
   }
 
   async updateCurrentDayAppetizersStatus() {
