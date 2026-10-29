@@ -20,6 +20,18 @@ Endpoints bajo `/api/v1/device-access`:
 - `POST /logout`: revoca la sesión actual; es idempotente.
 - `GET /settings` y `PUT /settings`: requieren JWT, rol ADMIN y perfil habilitado.
 
+Para cambiar una clave configurada, `PUT /settings` requiere
+`{ "password": "nueva clave", "currentPassword": "clave actual" }`.
+Ambas claves corresponden al acceso del dispositivo, no al inicio de sesión administrativo.
+Solo la configuración inicial (`GET /settings` devuelve `configured: false`)
+permite omitir `currentPassword`. Ambos campos deben tener entre 8 y 128 caracteres.
+La nueva clave conserva el nombre de campo `password`.
+
+Errores: `400 CURRENT_PASSWORD_REQUIRED` si falta la clave actual,
+`403 CURRENT_PASSWORD_INVALID` si es incorrecta, y `409 DEVICE_PASSWORD_CHANGED`
+si otra solicitud cambia o configura la clave simultáneamente. Los errores de formato
+devuelven `400` de validación. Un intento rechazado no modifica la clave ni revoca sesiones.
+
 Los menús, reservas y el ingreso por cédula verifican la sesión en el servidor.
 Las operaciones administrativas conservan sus guards JWT y pueden operar sin
 sesión compartida. El ingreso por cédula siempre requiere la sesión del dispositivo.

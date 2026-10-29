@@ -11,9 +11,10 @@ describe('DeviceAccessService', () => {
   const prisma = {
     deviceAccessConfig: {
       findUnique: jest.fn(),
-      upsert: jest.fn<
-        Promise<void>,
-        [{ create: Config; update: Config; where: { id: number } }]
+      create: jest.fn<Promise<void>, [{ data: Config & { id: number } }]>(),
+      updateMany: jest.fn<
+        Promise<{ count: number }>,
+        [{ data: Config; where: { id: number; version: string } }]
       >(),
     },
     deviceSession: {
@@ -26,12 +27,13 @@ describe('DeviceAccessService', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+    prisma.deviceAccessConfig.updateMany.mockResolvedValue({ count: 1 });
     service = new DeviceAccessService(prisma as unknown as PrismaService);
   });
 
   async function configure() {
     await service.setPassword('clave-segura');
-    const config = prisma.deviceAccessConfig.upsert.mock.calls[0][0].create as {
+    const config = prisma.deviceAccessConfig.create.mock.calls[0][0].data as {
       passwordHash: string;
       version: string;
     };
@@ -79,11 +81,80 @@ describe('DeviceAccessService', () => {
     prisma.deviceSession.findUnique.mockResolvedValue(
       prisma.deviceSession.create.mock.calls[0][0].data,
     );
-    await service.setPassword('otra-clave');
+    await service.setPassword('otra-clave', 'clave-segura');
     prisma.deviceAccessConfig.findUnique.mockResolvedValue(
-      prisma.deviceAccessConfig.upsert.mock.calls[1][0].create,
+      prisma.deviceAccessConfig.updateMany.mock.calls[0][0].data,
     );
     expect(await service.validate(result.token)).toBeNull();
+    await expect(service.login('clave-segura', 'device')).rejects.toThrow(
+      UnauthorizedException,
+    );
+    await expect(service.login('otra-clave', 'device')).resolves.toHaveProperty(
+      'token',
+    );
+  });
+
+  it('allows initial setup without a current password', async () => {
+    await expect(service.setPassword('clave-segura')).resolves.toEqual({
+      configured: true,
+    });
+    expect(prisma.deviceAccessConfig.create).toHaveBeenCalledTimes(1);
+    expect(prisma.deviceAccessConfig.updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, ''])(
+    'requires the current password when configured (%p)',
+    async (currentPassword) => {
+      await configure();
+      await expect(
+        service.setPassword('otra-clave', currentPassword),
+      ).rejects.toMatchObject({
+        response: { code: 'CURRENT_PASSWORD_REQUIRED' },
+        status: 400,
+      });
+      expect(prisma.deviceAccessConfig.updateMany).not.toHaveBeenCalled();
+      expect(prisma.deviceAccessConfig.create).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('rejects an incorrect current password without revoking sessions', async () => {
+    await configure();
+    const session = await service.login('clave-segura', 'device');
+    prisma.deviceSession.findUnique.mockResolvedValue(
+      prisma.deviceSession.create.mock.calls[0][0].data,
+    );
+    await expect(
+      service.setPassword('otra-clave', 'incorrecta'),
+    ).rejects.toMatchObject({
+      response: { code: 'CURRENT_PASSWORD_INVALID' },
+      status: 403,
+    });
+    expect(prisma.deviceAccessConfig.updateMany).not.toHaveBeenCalled();
+    expect(await service.validate(session.token)).not.toBeNull();
+  });
+
+  it('does not overwrite a password changed concurrently', async () => {
+    const config = await configure();
+    prisma.deviceAccessConfig.updateMany.mockResolvedValue({ count: 0 });
+    await expect(
+      service.setPassword('otra-clave', 'clave-segura'),
+    ).rejects.toMatchObject({
+      response: { code: 'DEVICE_PASSWORD_CHANGED' },
+      status: 409,
+    });
+    expect(prisma.deviceAccessConfig.updateMany).toHaveBeenCalledWith({
+      where: { id: 1, version: config.version },
+      data: expect.any(Object) as Config,
+    });
+  });
+
+  it('does not overwrite a concurrently initialized password', async () => {
+    prisma.deviceAccessConfig.create.mockRejectedValue({ code: 'P2002' });
+    await expect(service.setPassword('clave-segura')).rejects.toMatchObject({
+      response: { code: 'DEVICE_PASSWORD_CHANGED' },
+      status: 409,
+    });
+    expect(prisma.deviceAccessConfig.updateMany).not.toHaveBeenCalled();
   });
 
   it('revokes only the current device session and rejects reuse', async () => {
