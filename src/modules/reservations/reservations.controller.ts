@@ -28,6 +28,7 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { DeviceAccess } from '../device-access/device-access.guard';
 import { ReservationsService } from './reservations.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
@@ -37,6 +38,7 @@ import { ReservationSummaryDto } from './dto/reservation-summary.dto';
 
 @ApiTags('Reservations')
 @Controller('reservations')
+@DeviceAccess()
 export class ReservationsController {
   constructor(private readonly reservations: ReservationsService) {}
 

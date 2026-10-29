@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DeviceAccessModule } from './modules/device-access/device-access.module';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './modules/auth/auth.module';
 import { ProteinsModule } from './modules/proteins/proteins.module';
@@ -22,6 +23,7 @@ import { AppetizersModule } from './modules/appetizers/appetizers.module';
       envFilePath: '.env',
     }),
     AuthModule,
+    DeviceAccessModule,
     ProteinsModule,
     SideDishesModule,
     SoupsModule,

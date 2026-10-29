@@ -27,6 +27,7 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { DeviceAccess } from '../device-access/device-access.guard';
 import { MenusService } from './menus.service';
 import { CreateMenuDto } from './dto/create-menu.dto';
 import { UpdateMenuDto } from './dto/update-menu.dto';
@@ -37,6 +38,7 @@ import { UserMenuResponseDto } from './dto/user-menu-response.dto';
 
 @ApiTags('Menus')
 @Controller('menus')
+@DeviceAccess()
 export class MenusController {
   constructor(private readonly menus: MenusService) {}
 
