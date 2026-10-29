@@ -9,7 +9,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { IsString, MaxLength, MinLength } from 'class-validator';
+import { IsString, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -21,6 +21,14 @@ class AccessPasswordDto {
   @MinLength(8)
   @MaxLength(128)
   password!: string;
+}
+
+class UpdateAccessPasswordDto extends AccessPasswordDto {
+  @ValidateIf((_object, value: unknown) => value !== undefined)
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  currentPassword?: string;
 }
 
 @Controller('device-access')
@@ -56,7 +64,7 @@ export class DeviceAccessController {
   @Put('settings')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  setPassword(@Body() body: AccessPasswordDto) {
-    return this.access.setPassword(body.password);
+  setPassword(@Body() body: UpdateAccessPasswordDto) {
+    return this.access.setPassword(body.password, body.currentPassword);
   }
 }

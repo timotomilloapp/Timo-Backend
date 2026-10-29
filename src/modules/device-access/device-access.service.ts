@@ -1,4 +1,7 @@
 import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
   HttpException,
   Injectable,
   UnauthorizedException,
@@ -32,18 +35,53 @@ export class DeviceAccessService {
     return { configured: !!config, updatedAt: config?.updatedAt ?? null };
   }
 
-  async setPassword(password: string) {
+  async setPassword(password: string, currentPassword?: string) {
+    const config = await this.prisma.deviceAccessConfig.findUnique({
+      where: { id: 1 },
+    });
+    if (config) {
+      if (!currentPassword) {
+        throw new BadRequestException({
+          code: 'CURRENT_PASSWORD_REQUIRED',
+          message: 'Debes ingresar la clave actual del dispositivo.',
+        });
+      }
+      if (!(await this.matchesPassword(currentPassword, config.passwordHash))) {
+        throw new ForbiddenException({
+          code: 'CURRENT_PASSWORD_INVALID',
+          message: 'La clave actual del dispositivo es incorrecta.',
+        });
+      }
+    }
     const salt = randomBytes(16).toString('hex');
     const hash = (await deriveKey(password, salt, 64)) as Buffer;
     const data = {
       passwordHash: `${salt}:${hash.toString('hex')}`,
       version: randomUUID(),
     };
-    await this.prisma.deviceAccessConfig.upsert({
-      where: { id: 1 },
-      create: { id: 1, ...data },
-      update: data,
-    });
+    if (config) {
+      const result = await this.prisma.deviceAccessConfig.updateMany({
+        where: { id: 1, version: config.version },
+        data,
+      });
+      if (result.count !== 1) this.passwordChanged();
+    } else {
+      try {
+        await this.prisma.deviceAccessConfig.create({
+          data: { id: 1, ...data },
+        });
+      } catch (error: unknown) {
+        if (
+          typeof error === 'object' &&
+          error !== null &&
+          'code' in error &&
+          error.code === 'P2002'
+        ) {
+          this.passwordChanged();
+        }
+        throw error;
+      }
+    }
     return { configured: true };
   }
 
@@ -71,9 +109,7 @@ export class DeviceAccessService {
       throw new UnauthorizedException(
         'El administrador debe configurar la clave de acceso.',
       );
-    const [salt, storedHash] = config.passwordHash.split(':');
-    const hash = (await deriveKey(password, salt, 64)) as Buffer;
-    if (!timingSafeEqual(hash, Buffer.from(storedHash, 'hex'))) {
+    if (!(await this.matchesPassword(password, config.passwordHash))) {
       throw new UnauthorizedException('Clave incorrecta.');
     }
     const token = randomBytes(32).toString('hex');
@@ -113,5 +149,19 @@ export class DeviceAccessService {
 
   private hashToken(token: string) {
     return createHash('sha256').update(token).digest('hex');
+  }
+
+  private async matchesPassword(password: string, passwordHash: string) {
+    const [salt, storedHash] = passwordHash.split(':');
+    const hash = (await deriveKey(password, salt, 64)) as Buffer;
+    return timingSafeEqual(hash, Buffer.from(storedHash, 'hex'));
+  }
+
+  private passwordChanged(): never {
+    throw new ConflictException({
+      code: 'DEVICE_PASSWORD_CHANGED',
+      message:
+        'La clave cambió durante la solicitud. Recarga e ingresa la clave actual.',
+    });
   }
 }
