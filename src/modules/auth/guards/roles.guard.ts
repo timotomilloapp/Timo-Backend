@@ -33,11 +33,10 @@ export class RolesGuard implements CanActivate {
 
     const profile = await this.prisma.profile.findUnique({
       where: { id: user.sub },
-      select: { role: true, enabled: true },
+      select: { role: true },
     });
 
-    if (!profile?.enabled)
-      throw new ForbiddenException('Profile not found or disabled');
+    if (!profile) throw new ForbiddenException('Profile not found');
 
     if (!requiredRoles.includes(profile.role)) {
       throw new ForbiddenException('Insufficient permission');

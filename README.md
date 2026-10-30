@@ -94,6 +94,7 @@ El sistema utiliza **Supabase Auth** para el manejo de identidades.
 
 *   **Menus:** Permite la creación de menús diarios especificando sopas, proteínas, acompañamientos y bebidas. Soporta la carga masiva mediante archivos `.xlsx`.
 *   **Reservations:** Gestión de pedidos vinculados a una fecha específica y un usuario de la lista blanca. 
+    *   **Proteína inmutable:** Una vez creada la reserva, su proteína no puede cambiarse. Se rechazan las modificaciones y la eliminación pública para impedir borrar y volver a elegir; la cancelación conserva el registro y la selección original.
     *   **Colombia Timezone:** Todos los timestamps y validaciones de fecha respetan el huso horario UTC-5.
     *   **Resumen Diario:** Endpoint para obtener el conteo consolidado de proteínas solicitadas para una fecha determinada.
 *   **Whitelist:** Filtro de seguridad que permite verificar si una CC (Cédula de Ciudadanía) está autorizada para realizar reservas.
@@ -105,6 +106,12 @@ El proyecto integra **GitHub Actions** para la automatización de procesos:
 *   Ejecución de pruebas unitarias (`test`).
 
 ## Consideraciones de Producción
+
+El acceso por cédula no requiere clave ni sesión de dispositivo. La migración
+`20261030140000_remove_device_access` elimina las tablas de la funcionalidad retirada.
+Aplicarla junto con el despliegue de esta versión y el frontend actualizado mediante
+`pnpm exec prisma migrate deploy`. Se conserva la migración original en el historial
+de Prisma porque ya fue aplicada.
 
 *   **Pgbouncer:** En entornos de producción (Supabase), se recomienda el uso de `?pgbouncer=true` en la `DATABASE_URL` para una gestión eficiente de conexiones.
 *   **Versionamiento:** La API está versionada mediante el prefijo de URI (`/api/v1`).

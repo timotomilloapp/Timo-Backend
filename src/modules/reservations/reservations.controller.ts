@@ -3,8 +3,6 @@ import {
   Controller,
   Delete,
   Get,
-  HttpCode,
-  HttpStatus,
   Param,
   ParseIntPipe,
   Patch,
@@ -18,7 +16,6 @@ import {
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
-  ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -28,7 +25,6 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { DeviceAccess } from '../device-access/device-access.guard';
 import { ReservationsService } from './reservations.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
@@ -38,7 +34,6 @@ import { ReservationSummaryDto } from './dto/reservation-summary.dto';
 
 @ApiTags('Reservations')
 @Controller('reservations')
-@DeviceAccess()
 export class ReservationsController {
   constructor(private readonly reservations: ReservationsService) {}
 
@@ -65,15 +60,12 @@ export class ReservationsController {
 
   @Patch(':id')
   @ApiOperation({
-    summary: 'Update reservation protein (public – uses CC in body)',
+    summary: 'Reject changes to the selected reservation protein',
+    deprecated: true,
   })
   @ApiParam({ name: 'id', description: 'Reservation UUID' })
-  @ApiOkResponse({
-    description: 'Reservation updated',
-    type: ReservationResponseDto,
-  })
   @ApiBadRequestResponse({
-    description: 'Validation error, same-day change, or protein not in menu',
+    description: 'The selected protein is immutable',
   })
   @ApiNotFoundResponse({ description: 'Reservation not found' })
   @ApiForbiddenResponse({ description: 'CC does not match reservation owner' })
@@ -232,15 +224,19 @@ export class ReservationsController {
   }
 
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete reservation (public - uses CC)' })
+  @ApiOperation({
+    summary: 'Reject deletion of a reservation with a selected protein',
+    deprecated: true,
+  })
   @ApiParam({ name: 'id', description: 'Reservation UUID' })
   @ApiQuery({
     name: 'cc',
     description: 'User document (CC) to verify ownership',
     required: true,
   })
-  @ApiNoContentResponse({ description: 'Reservation deleted' })
+  @ApiBadRequestResponse({
+    description: 'Reservations cannot be deleted to choose another protein',
+  })
   @ApiNotFoundResponse({ description: 'Reservation not found' })
   @ApiForbiddenResponse({ description: 'CC does not match reservation owner' })
   async delete(

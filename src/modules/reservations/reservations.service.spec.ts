@@ -259,23 +259,37 @@ describe('ReservationsService', () => {
       },
     };
 
-    it('should update protein directly (no side dishes)', async () => {
+    it('should reject changing a selected protein even before printing', async () => {
       prisma.reservation.findUnique.mockResolvedValue(reservationWithMenu);
-      const updated = fakeReservation({ proteinTypeId: 'prot-b' });
-      prisma.reservation.update.mockResolvedValue(updated);
-
-      const result = await service.update('res-1', dto);
-
-      expect(result).toEqual(updated);
-      expect(prisma.reservation.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'res-1' },
-          data: expect.objectContaining({ proteinTypeId: 'prot-b' }) as Record<
-            string,
-            unknown
-          >,
-        }),
+      await expect(service.update('res-1', dto)).rejects.toThrow(
+        BadRequestException,
       );
+      expect(prisma.reservation.update).not.toHaveBeenCalled();
+    });
+
+    it.each(['RESERVADA', 'AUTO_ASIGNADA', 'SERVIDA', 'CANCELADA'])(
+      'should preserve the selected protein for status %s',
+      async (status) => {
+        prisma.reservation.findUnique.mockResolvedValue({
+          ...reservationWithMenu,
+          status,
+        });
+        await expect(service.update('res-1', dto)).rejects.toThrow(
+          BadRequestException,
+        );
+        expect(prisma.reservation.update).not.toHaveBeenCalled();
+      },
+    );
+
+    it('should not change a protein after the ticket was printed', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({
+        ...reservationWithMenu,
+        printedAt: new Date(),
+      });
+      await expect(service.update('res-1', dto)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.reservation.update).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when not found', async () => {
@@ -400,17 +414,15 @@ describe('ReservationsService', () => {
    *  DELETE
    * ═══════════════════════════════════════════════ */
   describe('delete', () => {
-    it('should delete and return { deleted: true, id }', async () => {
+    it('should prevent deleting a reservation to choose another protein', async () => {
       prisma.reservation.findUnique.mockResolvedValue({
         id: 'res-1',
         cc: '123456',
       });
-      prisma.reservation.delete.mockResolvedValue(undefined);
-
-      expect(await service.delete('res-1', '123456')).toEqual({
-        deleted: true,
-        id: 'res-1',
-      });
+      await expect(service.delete('res-1', '123456')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.reservation.delete).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when not found', async () => {

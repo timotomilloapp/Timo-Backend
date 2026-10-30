@@ -42,7 +42,6 @@ import { BulkResultResponseDto } from './dto/bulk-result-response.dto';
 import { WhitelistLoginDto } from './dto/whitelist-login.dto';
 import { WhitelistLoginResponseDto } from './dto/whitelist-login-response.dto';
 import { Public } from '../auth/decorators/public.decorator';
-import { DeviceAccess } from '../device-access/device-access.guard';
 
 @ApiTags('Whitelist')
 @ApiBearerAuth()
@@ -55,7 +54,6 @@ export class WhitelistController {
   constructor(private readonly whitelist: WhitelistService) {}
 
   @Post('login')
-  @DeviceAccess(false)
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
