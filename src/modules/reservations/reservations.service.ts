@@ -162,20 +162,13 @@ export class ReservationsService {
 
   /* ───────── UPDATE (change protein) ───────── */
 
-  async update(id: string, dto: UpdateReservationDto) {
+  async update(id: string, dto: UpdateReservationDto): Promise<never> {
     const cc = dto.cc.trim();
     this.logger.log(`UPDATE reservation — id=${id} cc=${cc}`);
 
     const reservation = await this.prisma.reservation.findUnique({
       where: { id },
-      include: {
-        menu: {
-          select: {
-            date: true,
-            proteinOptions: { select: { proteinTypeId: true } },
-          },
-        },
-      },
+      select: { id: true, cc: true },
     });
     if (!reservation) {
       this.logger.warn(`UPDATE rejected — id=${id} not found`);
@@ -190,42 +183,9 @@ export class ReservationsService {
       );
     }
 
-    const dateStr = this.menuDateStr(reservation.menu.date);
-    if (!isDateTomorrowOrLaterColombia(dateStr)) {
-      throw new BadRequestException(
-        'El menú ya se encuentra en preparación para el día de hoy.',
-      );
-    }
-
-    if (reservation.status === 'CANCELADA') {
-      throw new BadRequestException('Cannot modify a cancelled reservation');
-    }
-
-    if (reservation.printedAt) {
-      throw new BadRequestException(
-        'El ticket ya fue impreso y la reservación no puede ser modificada',
-      );
-    }
-
-    // Validate protein is in menu options
-    const validProteins = reservation.menu.proteinOptions.map(
-      (o: { proteinTypeId: string }) => o.proteinTypeId,
+    throw new BadRequestException(
+      'La proteína seleccionada no se puede cambiar.',
     );
-    if (!validProteins.includes(dto.proteinTypeId)) {
-      throw new BadRequestException(
-        'Selected protein is not available in this menu',
-      );
-    }
-
-    // Execute update immediately (side dishes remain untouched)
-    return await this.prisma.reservation.update({
-      where: { id },
-      data: {
-        proteinTypeId: dto.proteinTypeId,
-        ...colombiaUpdatedAt(),
-      },
-      include: INCLUDE_RELATIONS,
-    });
   }
 
   /* ───────── CANCEL ───────── */
@@ -306,7 +266,7 @@ export class ReservationsService {
 
   /* ───────── DELETE (public) ───────── */
 
-  async delete(id: string, cc: string) {
+  async delete(id: string, cc: string): Promise<never> {
     cc = cc.trim();
     this.logger.log(`DELETE reservation — id=${id} cc=${cc}`);
 
@@ -329,9 +289,9 @@ export class ReservationsService {
       );
     }
 
-    await this.prisma.reservation.delete({ where: { id } });
-    this.logger.log(`DELETE success — id=${id}`);
-    return { deleted: true, id };
+    throw new BadRequestException(
+      'La reserva no se puede eliminar para cambiar la proteína seleccionada.',
+    );
   }
 
   /* ───────── LIST ALL (admin) ───────── */

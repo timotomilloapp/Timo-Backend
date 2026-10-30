@@ -2,21 +2,6 @@ generator client {
   provider = "prisma-client-js"
 }
 
-model DeviceAccessConfig {
-  id           Int      @id @default(1)
-  passwordHash String
-  version      String
-  updatedAt    DateTime @updatedAt
-}
-
-model DeviceSession {
-  tokenHash String   @id
-  version   String
-  expiresAt DateTime
-
-  @@index([expiresAt])
-}
-
 datasource db {
   provider = "postgresql"
 }
